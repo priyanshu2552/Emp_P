@@ -22,6 +22,19 @@ const userSchema = new mongoose.Schema({
     enum: ['admin', 'manager', 'employee'],
     default: 'employee',
   },
+  manager: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+    validate: {
+      validator: async function(value) {
+        if (!value) return true; // null is allowed
+        const manager = await mongoose.model('User').findById(value);
+        return manager && (manager.role === 'manager' || manager.role === 'admin');
+      },
+      message: 'Manager must be either an admin or manager role'
+    }
+  },
   contact: String,
   address: String,
   profileImage: String,

@@ -1,9 +1,9 @@
 import React from 'react';
-import { 
-  Box, 
-  Typography, 
-  Grid, 
-  Card, 
+import {
+  Box,
+  Typography,
+  Grid,
+  Card,
   CardContent,
   Stack,
   LinearProgress
@@ -28,11 +28,11 @@ const AdminDashboard = () => {
       <Typography variant="h4" gutterBottom sx={{ mb: 4 }}>
         Admin Dashboard
       </Typography>
-      
+
       <Grid container spacing={4}>
         {stats.map((stat, index) => (
           <Grid item xs={12} sm={6} md={3} key={index}>
-            <Card sx={{ 
+            <Card sx={{
               height: '100%',
               borderLeft: `4px solid ${stat.color}`,
               boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)'
@@ -55,7 +55,7 @@ const AdminDashboard = () => {
             </Card>
           </Grid>
         ))}
-        
+
         <Grid item xs={12} md={8}>
           <Card sx={{ p: 2, boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)' }}>
             <Typography variant="h6" gutterBottom>
@@ -71,7 +71,7 @@ const AdminDashboard = () => {
             </Box>
           </Card>
         </Grid>
-        
+
         <Grid item xs={12} md={4}>
           <Card sx={{ p: 2, boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)' }}>
             <Typography variant="h6" gutterBottom>

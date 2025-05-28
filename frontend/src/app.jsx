@@ -1,64 +1,30 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
-import { AuthProvider } from './context/AuthContext';
-import Layout from './pages/Layout';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+
 import Login from './pages/Auth/Login';
-import AdminDashboard from './pages/Dashboard/AdminDashboard';
 import EmployeeDashboard from './pages/Dashboard/EmployeeDashboard';
 import ManagerDashboard from './pages/Dashboard/ManagerDashboard';
-import PrivateRoute from './components/PrivateRoute';
-
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-    background: {
-      default: '#f5f7fa',
-    },
-  },
-  typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-  },
-});
-
+import AdminDashboard from './pages/Dashboard/AdminDashboard';
+import EmployeeProfile from './pages/Employee/Profile'; // Import the profile page
+import ExpenseTracker from './pages/Employee/Expense';
+import Leave from './pages/Employee/Leave';
+import EmployeeReviews from './pages/Employee/Review';
+import EmployeePolicyPage from './pages/Employee/Policy';
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-       <Router>
-      <AuthProvider>
-       
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            
-            <Route element={<Layout />}>
-              <Route path="/" element={<Navigate to="/login" replace />} />
-              
-              <Route element={<PrivateRoute allowedRoles={['admin']} />}>
-                <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              </Route>
-              
-              <Route element={<PrivateRoute allowedRoles={['employee']} />}>
-                <Route path="/employee/dashboard" element={<EmployeeDashboard />} />
-              </Route>
-              
-              <Route element={<PrivateRoute allowedRoles={['manager']} />}>
-                <Route path="/manager/dashboard" element={<ManagerDashboard />} />
-              </Route>
-            </Route>
-            
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        
-      </AuthProvider>
-      </Router>
-    </ThemeProvider>
+    <Router>
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
+        <Route path="/manager-dashboard" element={<ManagerDashboard />} />
+        <Route path="/admin-dashboard" element={<AdminDashboard />} />
+        <Route path="/employee/profile" element={<EmployeeProfile />} /> {/* Added profile route */}
+        <Route path="/employee/expense" element={<ExpenseTracker />} />
+        <Route path="/employee/leave" element={<Leave />} />
+        <Route path="/employee/review" element={<EmployeeReviews />} />
+        <Route path="/employee/policy" element={<EmployeePolicyPage />} />
+        </Routes>
+    </Router>
   );
 }
 

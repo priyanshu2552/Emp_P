@@ -4,9 +4,8 @@ dotenv.config(); // ✅ Load env FIRST
 
 const connectDB = require('./config/db');
 const cors = require('cors');
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const User = require('./models/User');
+const employeeRoutes = require('./routes/employeeRoutes');
+
 
 connectDB(); // ✅ Now MONGO_URI is defined
 
@@ -19,6 +18,14 @@ app.get("/", (req, res) => {
 })
 // Auth routes (login for all roles)
 app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/employees', employeeRoutes);
+
+const mongoose = require('mongoose');
+const Policy = require('./models/Policy'); // Update path if necessary
+
+
+
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

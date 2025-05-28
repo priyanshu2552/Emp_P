@@ -1,41 +1,40 @@
 const mongoose = require('mongoose');
+const mongoosePaginate = require('mongoose-paginate-v2');
 
 const expenseSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
+    required: true
   },
   amount: {
     type: Number,
-    required: [true, 'Please provide an amount'],
+    required: true
   },
   description: {
     type: String,
-    required: [true, 'Please provide a description'],
+    required: true
   },
-  category: String,
-  receiptUrl: String,
+  category: {
+    type: String,
+    default: 'Uncategorized'
+  },
+  receiptUrl: {
+    type: String,
+    default: ''
+  },
   status: {
     type: String,
     enum: ['pending', 'approved', 'rejected'],
-    default: 'pending',
+    default: 'pending'
   },
-  approvedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-  },
-  managerComment: String,
   createdAt: {
     type: Date,
-    default: Date.now,
-  },
-  updatedAt: Date,
+    default: Date.now
+  }
 });
 
-expenseSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
-});
+// Add the pagination plugin here 👇
+expenseSchema.plugin(mongoosePaginate);
 
 module.exports = mongoose.model('Expense', expenseSchema);
