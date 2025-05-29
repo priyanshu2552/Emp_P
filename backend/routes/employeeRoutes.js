@@ -7,7 +7,7 @@ const uploadMiddleware = require('../middlewares/uploadMiddleware');
 const employeeLeave = require('../controllers/EmployeeControllers/employeeLeave');
 const employeeReview = require('../controllers/EmployeeControllers/employeeReview');
 const policyController = require('../controllers/EmployeeControllers/employeePolicy');
-
+const { createAppraisal, getMyAppraisals } = require('../controllers/EmployeeControllers/appraisalController');
 
 
 // ----- Employee Profile Routes -----
@@ -43,5 +43,10 @@ router.get('/reviews', authMiddleware.protect, employeeReview.getEmployeeReviews
 //---------Pilicies------
 router.get('/policies', authMiddleware.protect, policyController.getAllPolicies);
 router.post('/policies/ack', authMiddleware.protect, policyController.markAsRead);
+
+//---------Appraisals---------
+router.post('/appraisal', authMiddleware.protect, createAppraisal);
+router.get('/appraisal', authMiddleware.protect, getMyAppraisals);
+
 
 module.exports = router;
