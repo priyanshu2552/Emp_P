@@ -105,6 +105,7 @@ const Leave = () => {
             <th>Type</th>
             <th>Reason</th>
             <th>Status</th>
+            <th>SuperVisor Comment</th>
           </tr>
         </thead>
         <tbody>
@@ -116,10 +117,11 @@ const Leave = () => {
                 <td>{leave.leaveType}</td>
                 <td>{leave.reason}</td>
                 <td>{leave.status}</td>
+                <td>{leave.SupervisorComment || '-'}</td>
               </tr>
             ))
           ) : (
-            <tr><td colSpan="5">No leave records found</td></tr>
+            <tr><td colSpan="6">No leave records found</td></tr>
           )}
         </tbody>
       </table>

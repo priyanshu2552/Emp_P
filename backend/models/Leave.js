@@ -28,7 +28,7 @@ const leaveSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },
-  managerComment: String,
+  SupervisorComment: String,
   createdAt: {
     type: Date,
     default: Date.now,
@@ -36,9 +36,10 @@ const leaveSchema = new mongoose.Schema({
   updatedAt: Date,
 });
 
-leaveSchema.pre('save', function(next) {
+leaveSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });
 
 module.exports = mongoose.model('Leave', leaveSchema);
+

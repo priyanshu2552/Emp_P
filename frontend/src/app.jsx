@@ -17,6 +17,13 @@ import ExpenseTracker1 from './pages/Manager/Expense';
 import ManagerLeave from './pages/Employee/Leave';
 import ManagerReviewDashboard from './pages/Manager/Review';
 import ManagerAppraisal from './pages/Manager/Appraisal';
+import AdminOverview from './pages/Admin/Dashboard';
+import AdminUsers from './pages/Admin/AdminUsers';
+import AdminExpenses from './pages/Admin/AdminExpense';
+import AdminLeave from './pages/Admin/AdminLeave';
+import AdminPolicies from './pages/Admin/AdminPolicies';
+import AdminAppraisalPage from './pages/Admin/AdminAppraisal';
+import WeeklyReviewAdminPage from './pages/Admin/AdminReview';
 function App() {
   return (
     <Router>
@@ -33,11 +40,18 @@ function App() {
         <Route path="/employee/appraisal" element={<AppraisalForm />} />
         <Route path="/manager/profile" element={<ManagerProfilePage />} />
         <Route path="/manager/policy" element={<ManagerPolicyPage />} />
-          <Route path="/manager/expense" element={<ExpenseTracker1 />} />
-          <Route path="/manager/leave" element={<ManagerLeave />} />
-          <Route path="/manager/review" element={<ManagerReviewDashboard />} />
-           <Route path="/manager/appraisal" element={<ManagerAppraisal />} />
-        </Routes>
+        <Route path="/manager/expense" element={<ExpenseTracker1 />} />
+        <Route path="/manager/leave" element={<ManagerLeave />} />
+        <Route path="/manager/review" element={<ManagerReviewDashboard />} />
+        <Route path="/manager/appraisal" element={<ManagerAppraisal />} />
+        <Route path="/admin/dashboard" element={<AdminOverview />} />
+        <Route path="/admin/users" element={<AdminUsers />} />
+        <Route path="/admin/expenses" element={<AdminExpenses />} />
+        <Route path="/admin/leaves" element={<AdminLeave />} />
+        <Route path="/admin/policies" element={<AdminPolicies />} />
+        <Route path="/admin/appraisal" element={<AdminAppraisalPage />} />
+        <Route path="/admin/review" element={<WeeklyReviewAdminPage />} />
+      </Routes>
     </Router>
   );
 }

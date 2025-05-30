@@ -1,3 +1,4 @@
+// models/Policy.js
 const mongoose = require('mongoose');
 
 const policySchema = new mongoose.Schema({
@@ -6,7 +7,10 @@ const policySchema = new mongoose.Schema({
     required: [true, 'Please provide a title'],
   },
   description: String,
-  fileUrl: String,
+  fileUrl: {
+    type: String,
+    required: true,
+  },
   version: {
     type: Number,
     default: 1,
@@ -23,8 +27,8 @@ const policySchema = new mongoose.Schema({
   updatedAt: Date,
 });
 
-policySchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
+policySchema.pre('save', function (next) {
+  if (this.isModified()) this.updatedAt = Date.now();
   next();
 });
 

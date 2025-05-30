@@ -28,13 +28,13 @@ const expenseSchema = new mongoose.Schema({
     enum: ['pending', 'approved', 'rejected'],
     default: 'pending'
   },
+  comments: { type: String },
   createdAt: {
     type: Date,
     default: Date.now
   }
 });
 
-// Add the pagination plugin here 👇
 expenseSchema.plugin(mongoosePaginate);
 
 module.exports = mongoose.model('Expense', expenseSchema);

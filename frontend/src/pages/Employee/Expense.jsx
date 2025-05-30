@@ -110,6 +110,7 @@ const ExpenseTracker = () => {
             <th>Description</th>
             <th>Category</th>
             <th>Status</th>
+            <th>Comments</th> {/* NEW */}
             <th>Date</th>
           </tr>
         </thead>
@@ -121,12 +122,13 @@ const ExpenseTracker = () => {
                 <td>{expense.description}</td>
                 <td>{expense.category}</td>
                 <td>{expense.status}</td>
+                <td>{expense.status !== 'pending' ? expense.comments || '—' : '—'}</td> {/* NEW */}
                 <td>{new Date(expense.createdAt).toLocaleDateString()}</td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan="5">No expenses found</td>
+              <td colSpan="6">No expenses found</td>
             </tr>
           )}
         </tbody>
