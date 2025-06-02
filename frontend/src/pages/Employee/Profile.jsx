@@ -7,7 +7,10 @@ import {
     Typography,
     Autocomplete,
     CircularProgress,
+    Avatar,
+    Paper
 } from '@mui/material';
+import DashboardLayout from '../../components/Layout/EmployeeLayout';
 
 const EmployeeProfile = () => {
     const [profile, setProfile] = useState(null);
@@ -20,12 +23,11 @@ const EmployeeProfile = () => {
         email: '',
         contact: '',
         profileImage: '',
-        manager: null, // this will store manager object { _id, name }
+        manager: null,
     });
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
 
-    // Axios instance with auth token
     const axiosInstance = axios.create({
         baseURL: 'http://localhost:5000/api',
         headers: {
@@ -33,12 +35,11 @@ const EmployeeProfile = () => {
         },
     });
 
-    // Fetch profile on mount
     useEffect(() => {
         const fetchProfile = async () => {
             try {
                 setLoadingProfile(true);
-                const { data } = await axiosInstance.get('/employees/profile'); // Adjust URL as needed
+                const { data } = await axiosInstance.get('/employees/profile');
                 if (data.success) {
                     setProfile(data.profile);
                     setForm({
@@ -58,7 +59,6 @@ const EmployeeProfile = () => {
         fetchProfile();
     }, []);
 
-    // Search managers when manager field is focused or changed
     const fetchManagers = async (search = '') => {
         try {
             setLoadingManagers(true);
@@ -75,9 +75,7 @@ const EmployeeProfile = () => {
         }
     };
 
-    // Handle input change
     const handleChange = (field) => (event, value) => {
-        // Special handling for Autocomplete (manager) - value is an object
         if (field === 'manager') {
             setForm((prev) => ({ ...prev, manager: value }));
         } else {
@@ -85,7 +83,6 @@ const EmployeeProfile = () => {
         }
     };
 
-    // Submit update profile
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
@@ -110,136 +107,236 @@ const EmployeeProfile = () => {
         }
     };
 
-    if (loadingProfile) return <CircularProgress />;
+    if (loadingProfile) {
+        return (
+            <DashboardLayout>
+                <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
+                    <CircularProgress size={60} />
+                </Box>
+            </DashboardLayout>
+        );
+    }
 
     return (
-        <Box maxWidth={600} mx="auto" mt={4} p={3} boxShadow={3} borderRadius={2}>
-            <Typography variant="h4" mb={3}>
-                Employee Profile
-            </Typography>
+        <DashboardLayout>
+            <Box sx={{ 
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                p: 2,
+                minHeight: 'calc(100vh - 64px)',
+                overflow: 'hidden'
+            }}>
+                <Box sx={{ 
+                    width: '100%',
+                    maxWidth: '800px'
+                }}>
+                    <Typography variant="h6" sx={{ 
+                        fontWeight: 600,
+                        mb: 2,
+                        fontSize: '1.1rem',
+                        textAlign: 'center'
+                    }}>
+                        My Profile
+                    </Typography>
 
-            {error && (
-                <Typography color="error" mb={2}>
-                    {error}
-                </Typography>
-            )}
-            {successMsg && (
-                <Typography color="primary" mb={2}>
-                    {successMsg}
-                </Typography>
-            )}
+                    {!editMode ? (
+                        <Paper elevation={0} sx={{ 
+                            p: 2,
+                            mb: 2,
+                            border: '1px solid #e0e0e0',
+                            borderRadius: '8px'
+                        }}>
+                            <Box sx={{ mb: 2 }}>
+                                <Box sx={{ 
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    pb: 1,
+                                    borderBottom: '2px solid #4f8bff'
+                                }}>
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                                        Personal Information
+                                    </Typography>
+                                    <Button 
+                                        variant="outlined" 
+                                        size="small"
+                                        onClick={() => setEditMode(true)}
+                                        sx={{ textTransform: 'none' }}
+                                    >
+                                        Edit
+                                    </Button>
+                                </Box>
+                            </Box>
 
-            {!editMode ? (
-                <>
-                    <Typography><b>Name:</b> {profile.name}</Typography>
-                    <Typography><b>Email:</b> {profile.email}</Typography>
-                    <Typography><b>Contact:</b> {profile.contact || 'N/A'}</Typography>
-                    <Typography><b>Manager:</b> {profile.manager?.name || 'None'}</Typography>
-                    {profile.profileImage && (
-                        <Box mt={2}>
-                            <img
-                                src={profile.profileImage}
-                                alt="Profile"
-                                style={{ width: '150px', borderRadius: '8px' }}
-                            />
+                            <Box display="flex" flexDirection={{ xs: 'column', sm: 'row' }} gap={2}>
+                                <Box display="flex" justifyContent="center" flexShrink={0}>
+                                    <Avatar
+                                        src={profile.profileImage}
+                                        alt="Profile"
+                                        sx={{ 
+                                            width: 80, 
+                                            height: 80,
+                                        }}
+                                    />
+                                </Box>
+                                <Box flex={1}>
+                                    <Box sx={{ display: 'flex', mb: 1 }}>
+                                        <Typography variant="body2" sx={{ width: 80, color: 'text.secondary' }}>Name:</Typography>
+                                        <Typography variant="body2">{profile.name}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', mb: 1 }}>
+                                        <Typography variant="body2" sx={{ width: 80, color: 'text.secondary' }}>Email:</Typography>
+                                        <Typography variant="body2">{profile.email}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', mb: 1 }}>
+                                        <Typography variant="body2" sx={{ width: 80, color: 'text.secondary' }}>Contact:</Typography>
+                                        <Typography variant="body2">{profile.contact || '-'}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', mb: 1 }}>
+                                        <Typography variant="body2" sx={{ width: 80, color: 'text.secondary' }}>Manager:</Typography>
+                                        <Typography variant="body2">{profile.manager?.name || '-'}</Typography>
+                                    </Box>
+                                </Box>
+                            </Box>
+                        </Paper>
+                    ) : (
+                        <Box component="form" onSubmit={handleSubmit}>
+                            <Paper elevation={0} sx={{ 
+                                p: 2,
+                                border: '1px solid #e0e0e0',
+                                borderRadius: '8px'
+                            }}>
+                                <Box sx={{ mb: 2 }}>
+                                    <Box sx={{ 
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        pb: 1,
+                                        borderBottom: '2px solid #4f8bff'
+                                    }}>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                                            Edit Profile
+                                        </Typography>
+                                    </Box>
+                                </Box>
+
+                                {error && (
+                                    <Typography color="error" variant="body2" mb={2}>
+                                        {error}
+                                    </Typography>
+                                )}
+                                {successMsg && (
+                                    <Typography color="primary" variant="body2" mb={2}>
+                                        {successMsg}
+                                    </Typography>
+                                )}
+
+                                <Box display="flex" flexDirection={{ xs: 'column', sm: 'row' }} gap={2}>
+                                    <Box display="flex" justifyContent="center" flexShrink={0}>
+                                        <Avatar
+                                            src={form.profileImage}
+                                            alt="Profile"
+                                            sx={{ 
+                                                width: 80, 
+                                                height: 80,
+                                            }}
+                                        />
+                                    </Box>
+                                    <Box flex={1}>
+                                        <TextField
+                                            label="Name"
+                                            value={form.name}
+                                            onChange={handleChange('name')}
+                                            fullWidth
+                                            margin="dense"
+                                            size="small"
+                                            required
+                                        />
+                                        <TextField
+                                            label="Email"
+                                            value={form.email}
+                                            disabled
+                                            fullWidth
+                                            margin="dense"
+                                            size="small"
+                                        />
+                                        <TextField
+                                            label="Contact"
+                                            value={form.contact}
+                                            onChange={handleChange('contact')}
+                                            fullWidth
+                                            margin="dense"
+                                            size="small"
+                                        />
+                                        <Autocomplete
+                                            options={managers}
+                                            getOptionLabel={(option) => option.name || ''}
+                                            value={form.manager}
+                                            onChange={handleChange('manager')}
+                                            onInputChange={(e, value, reason) => {
+                                                if (reason === 'input' || reason === 'clear') fetchManagers(value);
+                                            }}
+                                            onFocus={() => {
+                                                if (managers.length === 0) fetchManagers('');
+                                            }}
+                                            loading={loadingManagers}
+                                            isOptionEqualToValue={(option, value) => option._id === value._id}
+                                            renderInput={(params) => (
+                                                <TextField
+                                                    {...params}
+                                                    label="Manager"
+                                                    margin="dense"
+                                                    size="small"
+                                                    InputProps={{
+                                                        ...params.InputProps,
+                                                        endAdornment: (
+                                                            <>
+                                                                {loadingManagers ? <CircularProgress color="inherit" size={16} /> : null}
+                                                                {params.InputProps.endAdornment}
+                                                            </>
+                                                        ),
+                                                    }}
+                                                />
+                                            )}
+                                            clearOnEscape
+                                        />
+                                        <TextField
+                                            label="Profile Image URL"
+                                            value={form.profileImage}
+                                            onChange={handleChange('profileImage')}
+                                            fullWidth
+                                            margin="dense"
+                                            size="small"
+                                            sx={{ mt: 1 }}
+                                        />
+                                    </Box>
+                                </Box>
+
+                                <Box display="flex" justifyContent="flex-end" gap={1} mt={2}>
+                                    <Button
+                                        variant="outlined"
+                                        size="small"
+                                        onClick={() => setEditMode(false)}
+                                        sx={{ textTransform: 'none' }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        variant="contained"
+                                        size="small"
+                                        type="submit"
+                                        sx={{ textTransform: 'none' }}
+                                    >
+                                        Save
+                                    </Button>
+                                </Box>
+                            </Paper>
                         </Box>
                     )}
-                    <Button variant="contained" sx={{ mt: 3 }} onClick={() => setEditMode(true)}>
-                        Edit Profile
-                    </Button>
-                </>
-            ) : (
-                <form onSubmit={handleSubmit} noValidate>
-                    <TextField
-                        label="Name"
-                        value={form.name}
-                        onChange={handleChange('name')}
-                        fullWidth
-                        margin="normal"
-                        required
-                    />
-                    <TextField
-                        label="Email"
-                        value={form.email}
-                        disabled
-                        fullWidth
-                        margin="normal"
-                    />
-                    <TextField
-                        label="Contact"
-                        value={form.contact}
-                        onChange={handleChange('contact')}
-                        fullWidth
-                        margin="normal"
-                    />
-
-                    {/* Manager Autocomplete */}
-                    <Autocomplete
-                        options={managers}
-                        getOptionLabel={(option) => option.name || ''}
-                        value={form.manager}
-                        onChange={handleChange('manager')}
-                        onInputChange={(e, value, reason) => {
-                            if (reason === 'input' || reason === 'clear') fetchManagers(value);
-                        }}
-                        onFocus={() => {
-                            if (managers.length === 0) fetchManagers('');
-                        }}
-                        loading={loadingManagers}
-                        isOptionEqualToValue={(option, value) => option._id === value._id}
-                        renderInput={(params) => (
-                            <TextField
-                                {...params}
-                                label="Manager"
-                                margin="normal"
-                                InputProps={{
-                                    ...params.InputProps,
-                                    endAdornment: (
-                                        <>
-                                            {loadingManagers ? <CircularProgress color="inherit" size={20} /> : null}
-                                            {params.InputProps.endAdornment}
-                                        </>
-                                    ),
-                                }}
-                            />
-                        )}
-                        clearOnEscape
-                    />
-
-
-                    <TextField
-                        label="Profile Image URL"
-                        value={form.profileImage}
-                        onChange={handleChange('profileImage')}
-                        fullWidth
-                        margin="normal"
-                    />
-
-                    <Box mt={2} display="flex" gap={2}>
-                        <Button variant="contained" type="submit" color="primary">
-                            Save
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            color="secondary"
-                            onClick={() => {
-                                setEditMode(false);
-                                setForm({
-                                    name: profile.name || '',
-                                    email: profile.email || '',
-                                    contact: profile.contact || '',
-                                    profileImage: profile.profileImage || '',
-                                    manager: profile.manager || null,
-                                });
-                                setError('');
-                            }}
-                        >
-                            Cancel
-                        </Button>
-                    </Box>
-                </form>
-            )}
-        </Box>
+                </Box>
+            </Box>
+        </DashboardLayout>
     );
 };
 

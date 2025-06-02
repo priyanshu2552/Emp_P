@@ -29,7 +29,8 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Login />} />
-        <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/employee/dashboard" element={<EmployeeDashboard />} />
         <Route path="/manager-dashboard" element={<ManagerDashboard />} />
         <Route path="/admin-dashboard" element={<AdminDashboard />} />
         <Route path="/employee/profile" element={<EmployeeProfile />} /> {/* Added profile route */}
