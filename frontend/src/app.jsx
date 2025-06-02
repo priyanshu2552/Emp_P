@@ -31,8 +31,8 @@ function App() {
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
         <Route path="/employee/dashboard" element={<EmployeeDashboard />} />
-        <Route path="/manager-dashboard" element={<ManagerDashboard />} />
-        <Route path="/admin-dashboard" element={<AdminDashboard />} />
+        <Route path="/manager/dashboard" element={<ManagerDashboard />} />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/employee/profile" element={<EmployeeProfile />} /> {/* Added profile route */}
         <Route path="/employee/expense" element={<ExpenseTracker />} />
         <Route path="/employee/leave" element={<Leave />} />

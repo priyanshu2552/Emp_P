@@ -8,7 +8,7 @@ import {
     CircularProgress,
     styled
 } from '@mui/material';
-import DashboardLayout from '../../components/Layout/EmployeeLayout';
+import EmployeeLayout from '../../components/Layout/EmployeeLayout';
 
 const API_BASE = 'http://localhost:5000/api/employees';
 
@@ -64,6 +64,7 @@ const EmployeePolicyPage = () => {
 
     const fetchPolicies = async () => {
         try {
+            setLoading(true);
             const res = await fetch(`${API_BASE}/policies`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
@@ -100,7 +101,7 @@ const EmployeePolicyPage = () => {
     }, []);
 
     return (
-        <DashboardLayout>
+        <EmployeeLayout>
             <Box sx={{ 
                 p: { xs: 2, md: 3 },
                 maxWidth: '1000px',
@@ -170,7 +171,7 @@ const EmployeePolicyPage = () => {
                                     
                                     <Box sx={{ display: 'flex', alignItems: 'center', mt: 2 }}>
                                         <StatusBadge read={policy.isRead}>
-                                            {policy.isRead ? '✓ Read' : '✗ Unread'}
+                                            {policy.isRead ? '✓ Acknowledged' : '✗ Pending Acknowledgement'}
                                         </StatusBadge>
                                         {!policy.isRead && (
                                             <Button
@@ -190,7 +191,7 @@ const EmployeePolicyPage = () => {
                                                     }
                                                 }}
                                             >
-                                                Mark as Read
+                                                Acknowledge Policy
                                             </Button>
                                         )}
                                     </Box>
@@ -201,7 +202,7 @@ const EmployeePolicyPage = () => {
                     </Box>
                 )}
             </Box>
-        </DashboardLayout>
+        </EmployeeLayout>
     );
 };
 

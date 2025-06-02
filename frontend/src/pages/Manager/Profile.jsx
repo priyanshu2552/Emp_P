@@ -1,22 +1,42 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { 
+  Box, 
+  Typography, 
+  Button, 
+  TextField, 
+  Divider, 
+  List, 
+  ListItem, 
+  ListItemText, 
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Paper,
+  IconButton,
+  Collapse
+} from '@mui/material';
+import { ExpandMore, ExpandLess } from '@mui/icons-material';
+import ManagerLayout from '../../components/Layout/ManagerLayout';
 
 const ManagerProfilePage = () => {
     const [manager, setManager] = useState({});
-    const [employees, setEmployees] = useState([]);
+    const [employees, setEmployees] = useState(null);
     const [showEmployeeList, setShowEmployeeList] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState(null);
     const [editMode, setEditMode] = useState(false);
     const [formData, setFormData] = useState({});
-    const [totalPendingAppraisals, setTotalPendingAppraisals] = useState(0);
+    const [totalPendingAppraisals, setTotalPendingAppraisals] = useState(null); // Changed from 0 to null
     const [loadingProfile, setLoadingProfile] = useState(false);
     const [loadingEmployees, setLoadingEmployees] = useState(false);
     const [loadingEmployeeDetails, setLoadingEmployeeDetails] = useState(false);
-    const navigate=useNavigate();
+    const [loadingAppraisalsCount, setLoadingAppraisalsCount] = useState(false);
+    const navigate = useNavigate();
     const [error, setError] = useState(null);
 
-    // Setup axios instance with base URL and Authorization header
     const axiosInstance = axios.create({
         baseURL: 'http://localhost:5000/api/manager',
         headers: {
@@ -24,9 +44,9 @@ const ManagerProfilePage = () => {
         },
     });
 
-    // Fetch manager profile on component mount
     useEffect(() => {
         fetchManagerProfile();
+        fetchPendingAppraisalsCount();
     }, []);
 
     const fetchManagerProfile = async () => {
@@ -35,7 +55,6 @@ const ManagerProfilePage = () => {
             setLoadingProfile(true);
             const res = await axiosInstance.get('/profile');
             setManager(res.data.manager);
-            setTotalPendingAppraisals(res.data.totalPendingAppraisals || 0);
             setFormData(res.data.manager);
         } catch (err) {
             setError('Error fetching manager profile');
@@ -44,6 +63,17 @@ const ManagerProfilePage = () => {
         }
     };
 
+    const fetchPendingAppraisalsCount = async () => {
+        try {
+            setLoadingAppraisalsCount(true);
+            const res = await axiosInstance.get('/pending-appraisals-count');
+            setTotalPendingAppraisals(res.data.count || 0);
+        } catch (err) {
+            setTotalPendingAppraisals(0);
+        } finally {
+            setLoadingAppraisalsCount(false);
+        }
+    };
 
     const fetchEmployees = async () => {
         try {
@@ -54,8 +84,17 @@ const ManagerProfilePage = () => {
             setShowEmployeeList(true);
         } catch (err) {
             setError('Error fetching employees');
+            setShowEmployeeList(false);
         } finally {
             setLoadingEmployees(false);
+        }
+    };
+
+    const toggleEmployeeList = () => {
+        if (showEmployeeList) {
+            setShowEmployeeList(false);
+        } else {
+            fetchEmployees();
         }
     };
 
@@ -73,7 +112,6 @@ const ManagerProfilePage = () => {
     };
 
     const updateProfile = async () => {
-        // Simple validation example
         if (!formData.name || formData.name.trim() === '') {
             alert('Name cannot be empty');
             return;
@@ -95,136 +133,203 @@ const ManagerProfilePage = () => {
     };
 
     const goToAppraisals = () => {
-        // Replace this with your routing logic, e.g., useHistory or useNavigate
-        alert('Navigate to Appraisals page');
         navigate('/manager/appraisal');
-        
     };
 
     return (
-        <div style={{ maxWidth: 600, margin: 'auto', padding: 20 }}>
-            <h1>Manager Profile</h1>
+        <ManagerLayout>
+            <Box sx={{ p: 3 }}>
+                <Typography variant="h4" gutterBottom>
+                    Manager Profile
+                </Typography>
 
-            {error && (
-                <p style={{ color: 'red' }}>{error}</p>
-            )}
+                {error && (
+                    <Typography color="error" paragraph>
+                        {error}
+                    </Typography>
+                )}
 
-            {loadingProfile ? (
-                <p>Loading profile...</p>
-            ) : !editMode ? (
-                <div>
-                    <p><b>Name:</b> {manager.name || '-'}</p>
-                    <p><b>Email:</b> {manager.email || '-'}</p>
-                    <p><b>Role:</b> {manager.role || '-'}</p>
-                    <p><b>Contact:</b> {manager.contact || '-'}</p>
-                    <p><b>Address:</b> {manager.address || '-'}</p>
-                    <button onClick={() => setEditMode(true)}>Edit Profile</button>
-                </div>
-            ) : (
-                <div>
-                    <div>
-                        <label>Name: </label>
-                        <input
-                            type="text"
-                            value={formData.name || ''}
-                            onChange={e => setFormData({ ...formData, name: e.target.value })}
-                        />
-                    </div>
-                    <div>
-                        <label>Contact: </label>
-                        <input
-                            type="text"
-                            value={formData.contact || ''}
-                            onChange={e => setFormData({ ...formData, contact: e.target.value })}
-                        />
-                    </div>
-                    <div>
-                        <label>Address: </label>
-                        <input
-                            type="text"
-                            value={formData.address || ''}
-                            onChange={e => setFormData({ ...formData, address: e.target.value })}
-                        />
-                    </div>
-                    <button onClick={updateProfile}>Save</button>
-                    <button onClick={() => setEditMode(false)} style={{ marginLeft: 10 }}>Cancel</button>
-                </div>
-            )}
-
-            <hr style={{ margin: '20px 0' }} />
-
-            <div>
-                <div
-                    style={{ cursor: 'pointer', fontWeight: 'bold' }}
-                    onClick={fetchEmployees}
-                >
-                    Employees: {loadingEmployees ? 'Loading...' : employees.length > 0 ? employees.length : 'Click to load'}
-                </div>
-                <div
-                    style={{ cursor: 'pointer', marginTop: 10, fontWeight: 'bold' }}
-                    onClick={goToAppraisals}
-                >
-                    Pending Appraisals: {totalPendingAppraisals} (Click to view)
-                </div>
-            </div>
-
-            {showEmployeeList && (
-                <div style={{ marginTop: 20, border: '1px solid gray', padding: 10, borderRadius: 5 }}>
-                    <h3>Employees List</h3>
-                    {employees.length === 0 ? (
-                        <p>No employees found.</p>
-                    ) : (
-                        employees.map(emp => (
-                            <div
-                                key={emp._id}
-                                onClick={() => fetchEmployeeDetails(emp._id)}
-                                style={{ padding: 8, borderBottom: '1px solid #ddd', cursor: 'pointer' }}
+                <Paper sx={{ p: 3, mb: 3 }}>
+                    {loadingProfile ? (
+                        <Box display="flex" justifyContent="center">
+                            <CircularProgress />
+                        </Box>
+                    ) : !editMode ? (
+                        <Box>
+                            <Typography variant="body1" paragraph>
+                                <strong>Name:</strong> {manager.name || '-'}
+                            </Typography>
+                            <Typography variant="body1" paragraph>
+                                <strong>Email:</strong> {manager.email || '-'}
+                            </Typography>
+                            <Typography variant="body1" paragraph>
+                                <strong>Role:</strong> {manager.role || '-'}
+                            </Typography>
+                            <Typography variant="body1" paragraph>
+                                <strong>Contact:</strong> {manager.contact || '-'}
+                            </Typography>
+                            <Typography variant="body1" paragraph>
+                                <strong>Address:</strong> {manager.address || '-'}
+                            </Typography>
+                            <Button 
+                                variant="contained" 
+                                color="primary" 
+                                onClick={() => setEditMode(true)}
+                                sx={{ mt: 2 }}
                             >
-                                {emp.name} - {emp.email}
-                            </div>
-                        ))
+                                Edit Profile
+                            </Button>
+                        </Box>
+                    ) : (
+                        <Box component="form">
+                            <TextField
+                                label="Name"
+                                fullWidth
+                                margin="normal"
+                                value={formData.name || ''}
+                                onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                required
+                            />
+                            <TextField
+                                label="Contact"
+                                fullWidth
+                                margin="normal"
+                                value={formData.contact || ''}
+                                onChange={e => setFormData({ ...formData, contact: e.target.value })}
+                            />
+                            <TextField
+                                label="Address"
+                                fullWidth
+                                margin="normal"
+                                multiline
+                                rows={3}
+                                value={formData.address || ''}
+                                onChange={e => setFormData({ ...formData, address: e.target.value })}
+                            />
+                            <Box sx={{ mt: 2 }}>
+                                <Button 
+                                    variant="contained" 
+                                    color="primary" 
+                                    onClick={updateProfile}
+                                    sx={{ mr: 2 }}
+                                >
+                                    Save
+                                </Button>
+                                <Button 
+                                    variant="outlined" 
+                                    onClick={() => setEditMode(false)}
+                                >
+                                    Cancel
+                                </Button>
+                            </Box>
+                        </Box>
                     )}
-                </div>
-            )}
+                </Paper>
 
-            {selectedEmployee && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: 0, left: 0,
-                        width: '100vw', height: '100vh',
-                        backgroundColor: 'rgba(0,0,0,0.5)',
-                        display: 'flex', justifyContent: 'center', alignItems: 'center',
-                        zIndex: 1000
-                    }}
-                    onClick={() => setSelectedEmployee(null)} // close when clicking outside box
-                >
-                    <div
-                        onClick={e => e.stopPropagation()} // prevent close when clicking inside box
-                        style={{
-                            backgroundColor: 'white',
-                            padding: 20,
-                            borderRadius: 5,
-                            width: 320,
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.26)',
-                        }}
+                <Divider sx={{ my: 3 }} />
+
+                <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
+                    <Button
+                        variant={showEmployeeList ? "contained" : "outlined"}
+                        onClick={toggleEmployeeList}
+                        disabled={loadingEmployees}
+                        endIcon={showEmployeeList ? <ExpandLess /> : <ExpandMore />}
                     >
-                        <h3>Employee Details</h3>
+                        {loadingEmployees 
+                            ? 'Loading...' 
+                            : employees === null 
+                                ? 'View Employees' 
+                                : `Employees (${employees.length})`
+                        }
+                    </Button>
+                    
+                    <Button
+                        variant="outlined"
+                        onClick={goToAppraisals}
+                        disabled={loadingAppraisalsCount}
+                    >
+                        {loadingAppraisalsCount 
+                            ? 'Loading...' 
+                            : totalPendingAppraisals === null 
+                                ? 'Pending Appraisals' 
+                                : `Pending Appraisals (${totalPendingAppraisals})`
+                        }
+                    </Button>
+                </Box>
+
+                <Collapse in={showEmployeeList}>
+                    <Paper sx={{ p: 3, mb: 3 }}>
+                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                            <Typography variant="h6">
+                                Employees List
+                            </Typography>
+                            <Button 
+                                size="small" 
+                                onClick={() => setShowEmployeeList(false)}
+                            >
+                                Close
+                            </Button>
+                        </Box>
+                        {employees === null ? (
+                            <Box display="flex" justifyContent="center">
+                                <CircularProgress />
+                            </Box>
+                        ) : employees.length === 0 ? (
+                            <Typography>No employees found.</Typography>
+                        ) : (
+                            <List>
+                                {employees.map(emp => (
+                                    <ListItem 
+                                        key={emp._id}
+                                        button
+                                        onClick={() => fetchEmployeeDetails(emp._id)}
+                                    >
+                                        <ListItemText 
+                                            primary={emp.name} 
+                                            secondary={emp.email} 
+                                        />
+                                    </ListItem>
+                                ))}
+                            </List>
+                        )}
+                    </Paper>
+                </Collapse>
+
+                <Dialog
+                    open={Boolean(selectedEmployee)}
+                    onClose={() => setSelectedEmployee(null)}
+                    maxWidth="sm"
+                    fullWidth
+                >
+                    <DialogTitle>Employee Details</DialogTitle>
+                    <DialogContent>
                         {loadingEmployeeDetails ? (
-                            <p>Loading...</p>
+                            <Box display="flex" justifyContent="center">
+                                <CircularProgress />
+                            </Box>
                         ) : (
                             <>
-                                <p><b>Name:</b> {selectedEmployee.name || '-'}</p>
-                                <p><b>Email:</b> {selectedEmployee.email || '-'}</p>
-                                <p><b>Contact:</b> {selectedEmployee.contact || '-'}</p>
-                                <p><b>Address:</b> {selectedEmployee.address || '-'}</p>
-                                <button onClick={() => setSelectedEmployee(null)}>Close</button>
+                                <Typography variant="body1" paragraph>
+                                    <strong>Name:</strong> {selectedEmployee?.name || '-'}
+                                </Typography>
+                                <Typography variant="body1" paragraph>
+                                    <strong>Email:</strong> {selectedEmployee?.email || '-'}
+                                </Typography>
+                                <Typography variant="body1" paragraph>
+                                    <strong>Contact:</strong> {selectedEmployee?.contact || '-'}
+                                </Typography>
+                                <Typography variant="body1" paragraph>
+                                    <strong>Address:</strong> {selectedEmployee?.address || '-'}
+                                </Typography>
                             </>
                         )}
-                    </div>
-                </div>
-            )}
-        </div>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setSelectedEmployee(null)}>Close</Button>
+                    </DialogActions>
+                </Dialog>
+            </Box>
+        </ManagerLayout>
     );
 };
 
