@@ -2,7 +2,6 @@ import React from 'react';
 import {
   Box,
   Typography,
-  Grid,
   Button,
   List,
   ListItem,
@@ -17,7 +16,7 @@ import {
   useTheme,
   useMediaQuery
 } from '@mui/material';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   Dashboard as DashboardIcon,
   People as PeopleIcon,
@@ -30,15 +29,9 @@ import {
   Notifications as NotificationsIcon,
   Menu as MenuIcon
 } from '@mui/icons-material';
-import AdminUsers from '../../pages/Admin/AdminUsers';
-import AdminPolicies from '../../pages/Admin/AdminPolicies';
-import AdminExpenses from '../../pages/Admin/AdminExpense';
-import AdminAppraisal from '../../pages/Admin/AdminAppraisal';
-import AdminReview from '../../pages/Admin/AdminReview';
-import AdminLeaves from '../../pages/Admin/AdminLeave';
 
 // Styled components
-const BackgroundContainer = styled(Box)({
+const BackgroundContainer = styled(Box)(({ theme }) => ({
   position: 'fixed',
   width: '100%',
   height: '100%',
@@ -51,6 +44,10 @@ const BackgroundContainer = styled(Box)({
     width: '35%',
     height: '100%',
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    [theme.breakpoints.down('md')]: {
+      width: '100%',
+      height: '35%'
+    }
   },
   '&::after': {
     content: '""',
@@ -60,8 +57,13 @@ const BackgroundContainer = styled(Box)({
     width: '65%',
     height: '100%',
     backgroundColor: '#ffffff',
+    [theme.breakpoints.down('md')]: {
+      width: '100%',
+      top: '35%',
+      height: '65%'
+    }
   }
-});
+}));
 
 const Sidebar = styled(Paper)(({ theme }) => ({
   width: 280,
@@ -88,19 +90,23 @@ const Sidebar = styled(Paper)(({ theme }) => ({
   }
 }));
 
-
 const MainContent = styled(Box)(({ theme }) => ({
-  marginLeft: '35%', // This matches the sidebar width
-  width: '65%', // Explicitly set width to 65%
-  padding: '60px 80px',
+  marginLeft: '35%',
+  width: '65%',
   minHeight: '100vh',
+  padding: theme.spacing(6, 8),
+  boxSizing: 'border-box',
   [theme.breakpoints.down('lg')]: {
-    padding: '40px',
+    padding: theme.spacing(4),
   },
   [theme.breakpoints.down('md')]: {
     marginLeft: 0,
     width: '100%',
-    padding: '80px 20px 20px',
+    padding: theme.spacing(8, 2, 2),
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    minHeight: '65vh'
   }
 }));
 
@@ -185,7 +191,7 @@ const AdminLayout = () => {
   };
 
   return (
-    <Box sx={{ position: 'relative' }}>
+    <Box sx={{ position: 'relative', overflowX: 'hidden' }}>
       {/* Background with two colors */}
       <BackgroundContainer />
 
@@ -231,7 +237,7 @@ const AdminLayout = () => {
 
         <Divider sx={{ mx: 3, my: 1 }} />
 
-        <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
+        <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
           <List
             disablePadding
             sx={{
@@ -289,46 +295,7 @@ const AdminLayout = () => {
 
       {/* Main Content Area - Right Side */}
       <MainContent>
-        {/* Empty content area - ready for your components */}
-        <Box sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: 'calc(100vh - 120px)',
-          textAlign: 'center'
-        }}>
-          <Typography variant="h4" sx={{
-            fontWeight: 600,
-            color: 'text.secondary',
-            mb: 2
-          }}>
-            Welcome to Admin Dashboard
-          </Typography>
-          <Typography variant="body1" sx={{
-            color: 'text.secondary',
-            maxWidth: '500px',
-            mb: 4
-          }}>
-            This is your main content area. Add your components, charts, and data here.
-          </Typography>
-          <Button
-            variant="contained"
-            sx={{
-              borderRadius: '12px',
-              px: 4,
-              py: 1.5,
-              textTransform: 'none',
-              fontWeight: 500,
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #5a6fd1 0%, #6a4299 100%)',
-              }
-            }}
-          >
-            Get Started
-          </Button>
-        </Box>
+        <Outlet />
       </MainContent>
     </Box>
   );

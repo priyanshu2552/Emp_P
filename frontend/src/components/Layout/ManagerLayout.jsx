@@ -79,7 +79,7 @@ const ManagerLayout = ({ children }) => {
         { label: 'Leave Approvals', to: '/manager/leave', icon: <LeaveIcon /> },
         { label: 'Appraisal Reviews', to: '/manager/appraisal', icon: <AppraisalIcon /> },
         { label: 'Weekly Reviews', to: '/manager/review', icon: <ReviewIcon /> },
-        { label: 'Team Management', to: '/manager/team', icon: <TeamIcon /> },
+       
     ];
 
     const StyledNavLink = styled(NavLink)(({ theme }) => ({
