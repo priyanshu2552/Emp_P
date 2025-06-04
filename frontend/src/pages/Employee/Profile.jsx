@@ -22,8 +22,11 @@ const EmployeeProfile = () => {
         name: '',
         email: '',
         contact: '',
+        address: '',
         profileImage: '',
         manager: null,
+        Department: '',
+        EmployeeId: '',
     });
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
@@ -46,8 +49,11 @@ const EmployeeProfile = () => {
                         name: data.profile.name || '',
                         email: data.profile.email || '',
                         contact: data.profile.contact || '',
+                        address: data.profile.address || '',
                         profileImage: data.profile.profileImage || '',
                         manager: data.profile.manager || null,
+                        Department: data.profile.Department || '',
+                        EmployeeId: data.profile.EmployeeId || '',
                     });
                 }
             } catch (err) {
@@ -92,8 +98,11 @@ const EmployeeProfile = () => {
             const updateData = {
                 name: form.name,
                 contact: form.contact,
+                address: form.address,
                 profileImage: form.profileImage,
                 manager: form.manager?._id || null,
+                Department: form.Department,
+                EmployeeId: form.EmployeeId,
             };
 
             const { data } = await axiosInstance.put('/employees/profile', updateData);
@@ -182,20 +191,36 @@ const EmployeeProfile = () => {
                                 </Box>
                                 <Box flex={1}>
                                     <Box sx={{ display: 'flex', mb: 1 }}>
-                                        <Typography variant="body2" sx={{ width: 80, color: 'text.secondary' }}>Name:</Typography>
+                                        <Typography variant="body2" sx={{ width: 120, color: 'text.secondary' }}>Name:</Typography>
                                         <Typography variant="body2">{profile.name}</Typography>
                                     </Box>
                                     <Box sx={{ display: 'flex', mb: 1 }}>
-                                        <Typography variant="body2" sx={{ width: 80, color: 'text.secondary' }}>Email:</Typography>
+                                        <Typography variant="body2" sx={{ width: 120, color: 'text.secondary' }}>Email:</Typography>
                                         <Typography variant="body2">{profile.email}</Typography>
                                     </Box>
                                     <Box sx={{ display: 'flex', mb: 1 }}>
-                                        <Typography variant="body2" sx={{ width: 80, color: 'text.secondary' }}>Contact:</Typography>
+                                        <Typography variant="body2" sx={{ width: 120, color: 'text.secondary' }}>Employee ID:</Typography>
+                                        <Typography variant="body2">{profile.EmployeeId || '-'}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', mb: 1 }}>
+                                        <Typography variant="body2" sx={{ width: 120, color: 'text.secondary' }}>Department:</Typography>
+                                        <Typography variant="body2">{profile.Department || '-'}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', mb: 1 }}>
+                                        <Typography variant="body2" sx={{ width: 120, color: 'text.secondary' }}>Contact:</Typography>
                                         <Typography variant="body2">{profile.contact || '-'}</Typography>
                                     </Box>
                                     <Box sx={{ display: 'flex', mb: 1 }}>
-                                        <Typography variant="body2" sx={{ width: 80, color: 'text.secondary' }}>Manager:</Typography>
+                                        <Typography variant="body2" sx={{ width: 120, color: 'text.secondary' }}>Address:</Typography>
+                                        <Typography variant="body2">{profile.address || '-'}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', mb: 1 }}>
+                                        <Typography variant="body2" sx={{ width: 120, color: 'text.secondary' }}>Manager:</Typography>
                                         <Typography variant="body2">{profile.manager?.name || '-'}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', mb: 1 }}>
+                                        <Typography variant="body2" sx={{ width: 120, color: 'text.secondary' }}>Role:</Typography>
+                                        <Typography variant="body2" textTransform="capitalize">{profile.role}</Typography>
                                     </Box>
                                 </Box>
                             </Box>
@@ -261,6 +286,22 @@ const EmployeeProfile = () => {
                                             margin="dense"
                                             size="small"
                                         />
+                                        {/* <TextField
+                                            label="Employee ID"
+                                            value={form.EmployeeId}
+                                            onChange={handleChange('EmployeeId')}
+                                            fullWidth
+                                            margin="dense"
+                                            size="small"
+                                        /> */}
+                                        <TextField
+                                            label="Department"
+                                            value={form.Department}
+                                            onChange={handleChange('Department')}
+                                            fullWidth
+                                            margin="dense"
+                                            size="small"
+                                        />
                                         <TextField
                                             label="Contact"
                                             value={form.contact}
@@ -268,6 +309,16 @@ const EmployeeProfile = () => {
                                             fullWidth
                                             margin="dense"
                                             size="small"
+                                        />
+                                        <TextField
+                                            label="Address"
+                                            value={form.address}
+                                            onChange={handleChange('address')}
+                                            fullWidth
+                                            margin="dense"
+                                            size="small"
+                                            multiline
+                                            rows={2}
                                         />
                                         <Autocomplete
                                             options={managers}

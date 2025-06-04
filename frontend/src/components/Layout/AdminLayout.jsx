@@ -41,7 +41,7 @@ const BackgroundContainer = styled(Box)(({ theme }) => ({
     position: 'absolute',
     top: 0,
     left: 0,
-    width: '35%',
+    width: '30%',
     height: '100%',
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     [theme.breakpoints.down('md')]: {
@@ -66,7 +66,7 @@ const BackgroundContainer = styled(Box)(({ theme }) => ({
 }));
 
 const Sidebar = styled(Paper)(({ theme }) => ({
-  width: 280,
+  width: 240,
   height: 'calc(100vh - 80px)',
   position: 'fixed',
   left: 40,
@@ -91,8 +91,8 @@ const Sidebar = styled(Paper)(({ theme }) => ({
 }));
 
 const MainContent = styled(Box)(({ theme }) => ({
-  marginLeft: '35%',
-  width: '65%',
+  marginLeft: '25%',
+  width: '75%',
   minHeight: '100vh',
   padding: theme.spacing(6, 8),
   boxSizing: 'border-box',
@@ -237,7 +237,13 @@ const AdminLayout = () => {
 
         <Divider sx={{ mx: 3, my: 1 }} />
 
-        <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+        <Box sx={{
+          flexGrow: 1, overflow: 'auto', '&::-webkit-scrollbar': {
+            display: 'none'
+          },
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none'
+        }}>
           <List
             disablePadding
             sx={{

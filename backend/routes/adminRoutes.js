@@ -10,7 +10,7 @@ const { getAdminDashboardData } = require('../controllers/AdminControllers/admin
 const { getUsers, addUser, deleteUser } = require('../controllers/AdminControllers/adminManageUser');
 const expenseController = require('../controllers/AdminControllers/adminExpense');
 const { getAllLeaves, updateLeaveStatus } = require('../controllers/AdminControllers/adminLeave');
-const { addPolicy, getAllPolicies, updatePolicy } = require('../controllers/AdminControllers/adminPolicies');
+const { addPolicy, getAllPolicies, updatePolicy, deletePolicy } = require('../controllers/AdminControllers/adminPolicies');
 const weeklyReviewController = require('../controllers/AdminControllers/adminWeeklyReview');
 
 // 🔐 Middleware to protect all admin routes
@@ -63,6 +63,7 @@ const upload = multer({
 router.get('/policies', getAllPolicies);
 router.post('/policies', upload.single('pdf'), addPolicy);
 router.put('/policies/:id', upload.single('pdf'), updatePolicy);
+router.delete('/policies/:id', protect, authorize('admin'), deletePolicy);
 
 // ==============================
 // Appraisal Management

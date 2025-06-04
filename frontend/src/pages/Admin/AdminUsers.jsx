@@ -73,9 +73,13 @@ const AdminUsers = () => {
   const handleAddUser = async () => {
     try {
       const token = localStorage.getItem('token');
-      await axios.post('http://localhost:5000/api/admin/users', newUser, {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await axios.post('http://localhost:5000/api/admin/users', newUser, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
       });
+
       setNewUser({
         name: '',
         email: '',
@@ -109,14 +113,15 @@ const AdminUsers = () => {
   }, [roleFilter]);
 
   return (
-    
-    <Box>
+
+    <Box sx={{ marginLeft: '3%' }}>
       <Box
         sx={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          mb: 4
+          mb: 4,
+
         }}
       >
         <Typography variant="h4" fontWeight={600}>
@@ -185,14 +190,14 @@ const AdminUsers = () => {
                           user.role === 'admin'
                             ? '#e3f2fd'
                             : user.role === 'manager'
-                            ? '#e8f5e9'
-                            : '#fff8e1',
+                              ? '#e8f5e9'
+                              : '#fff8e1',
                         color:
                           user.role === 'admin'
                             ? '#1976d2'
                             : user.role === 'manager'
-                            ? '#2e7d32'
-                            : '#ff8f00',
+                              ? '#2e7d32'
+                              : '#ff8f00',
                         fontWeight: 500
                       }}
                     >
@@ -276,7 +281,10 @@ const AdminUsers = () => {
               <InputLabel>Manager</InputLabel>
               <Select
                 value={newUser.manager || ''}
-                onChange={(e) => setNewUser({ ...newUser, manager: e.target.value })}
+                onChange={(e) => setNewUser({
+                  ...newUser,
+                  manager: e.target.value === '' ? null : e.target.value
+                })}
                 displayEmpty
                 label="Manager"
               >

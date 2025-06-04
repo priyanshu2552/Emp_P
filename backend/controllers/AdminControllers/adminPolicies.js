@@ -57,3 +57,25 @@ exports.updatePolicy = async (req, res) => {
     res.status(500).json({ success: false, message: 'Error updating policy' });
   }
 };
+exports.deletePolicy = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const policy = await Policy.findById(id);
+    if (!policy) {
+      return res.status(404).json({ success: false, message: 'Policy not found' });
+    }
+
+    // Delete the associated PDF file
+    const filePath = path.join(__dirname, '../../', policy.fileUrl);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    await Policy.findByIdAndDelete(id);
+    res.json({ success: true, message: 'Policy deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Error deleting policy' });
+  }
+};
+
