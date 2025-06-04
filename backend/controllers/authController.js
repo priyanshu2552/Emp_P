@@ -20,6 +20,12 @@ const login = async (req, res) => {
 
     const token = generateToken(user._id, user.role);
 
+    // Convert binary image data to base64 if exists
+    let profileImage = null;
+    if (user.profileImage && user.profileImage.data) {
+      profileImage = `data:${user.profileImage.contentType};base64,${user.profileImage.data.toString('base64')}`;
+    }
+
     res.json({
       token,
       user: {
@@ -27,6 +33,7 @@ const login = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        profileImage // Include the profile image in the response
       },
     });
   } catch (err) {
@@ -34,5 +41,4 @@ const login = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
-
 module.exports = { login };

@@ -22,11 +22,11 @@ const userSchema = new mongoose.Schema({
     enum: ['admin', 'manager', 'employee'],
     default: 'employee',
   },
-  Department:{
-   type:String,
+  Department: {
+    type: String,
   },
-  EmployeeId:{
-    type:String,
+  EmployeeId: {
+    type: String,
   },
   manager: {
     type: mongoose.Schema.Types.ObjectId,
@@ -34,7 +34,7 @@ const userSchema = new mongoose.Schema({
     default: null,
     validate: {
       validator: async function(value) {
-        if (!value) return true; // null is allowed
+        if (!value) return true;
         const manager = await mongoose.model('User').findById(value);
         return manager && (manager.role === 'manager' || manager.role === 'admin');
       },
@@ -43,7 +43,10 @@ const userSchema = new mongoose.Schema({
   },
   contact: String,
   address: String,
-  profileImage: String,
+  profileImage: {
+    data: Buffer,
+    contentType: String
+  },
   createdAt: {
     type: Date,
     default: Date.now,

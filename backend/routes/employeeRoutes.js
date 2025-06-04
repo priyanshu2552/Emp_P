@@ -8,6 +8,25 @@ const employeeLeave = require('../controllers/EmployeeControllers/employeeLeave'
 const employeeReview = require('../controllers/EmployeeControllers/employeeReview');
 const policyController = require('../controllers/EmployeeControllers/employeePolicy');
 const { createAppraisal, getMyAppraisals } = require('../controllers/EmployeeControllers/appraisalController');
+const multer = require('multer');
+
+//-----image Upload things-------
+const upload = multer({
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  }
+});
+router.put(
+  '/profile/image',
+  authMiddleware.protect,
+  upload.single('profileImage'),
+  employeeController.uploadProfileImage
+);
+
+router.get(
+  '/:userId/profile-image',
+  employeeController.getProfileImage
+);
 
 
 // ----- Employee Profile Routes -----

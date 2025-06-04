@@ -8,9 +8,24 @@ import {
     Autocomplete,
     CircularProgress,
     Avatar,
-    Paper
+    Paper,
+    Snackbar,
+    Alert
 } from '@mui/material';
+import { styled } from '@mui/material/styles';
 import DashboardLayout from '../../components/Layout/EmployeeLayout';
+
+const VisuallyHiddenInput = styled('input')({
+  clip: 'rect(0 0 0 0)',
+  clipPath: 'inset(50%)',
+  height: 1,
+  overflow: 'hidden',
+  position: 'absolute',
+  bottom: 0,
+  left: 0,
+  whiteSpace: 'nowrap',
+  width: 1,
+});
 
 const EmployeeProfile = () => {
     const [profile, setProfile] = useState(null);
@@ -23,13 +38,17 @@ const EmployeeProfile = () => {
         email: '',
         contact: '',
         address: '',
-        profileImage: '',
         manager: null,
         Department: '',
         EmployeeId: '',
     });
-    const [error, setError] = useState('');
-    const [successMsg, setSuccessMsg] = useState('');
+    const [snackbar, setSnackbar] = useState({
+        open: false,
+        message: '',
+        severity: 'success'
+    });
+    const [imagePreview, setImagePreview] = useState('');
+    const [uploadingImage, setUploadingImage] = useState(false);
 
     const axiosInstance = axios.create({
         baseURL: 'http://localhost:5000/api',
@@ -50,14 +69,16 @@ const EmployeeProfile = () => {
                         email: data.profile.email || '',
                         contact: data.profile.contact || '',
                         address: data.profile.address || '',
-                        profileImage: data.profile.profileImage || '',
                         manager: data.profile.manager || null,
                         Department: data.profile.Department || '',
                         EmployeeId: data.profile.EmployeeId || '',
                     });
+                    if (data.profile._id) {
+                       setImagePreview(`http://localhost:5000/api/employees/${data.profile._id}/profile-image?${Date.now()}`);
+                    }
                 }
             } catch (err) {
-                setError('Failed to load profile.');
+                showSnackbar('Failed to load profile.', 'error');
             } finally {
                 setLoadingProfile(false);
             }
@@ -91,15 +112,12 @@ const EmployeeProfile = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
-        setSuccessMsg('');
-
+        
         try {
             const updateData = {
                 name: form.name,
                 contact: form.contact,
                 address: form.address,
-                profileImage: form.profileImage,
                 manager: form.manager?._id || null,
                 Department: form.Department,
                 EmployeeId: form.EmployeeId,
@@ -108,12 +126,61 @@ const EmployeeProfile = () => {
             const { data } = await axiosInstance.put('/employees/profile', updateData);
             if (data.success) {
                 setProfile(data.profile);
-                setSuccessMsg('Profile updated successfully!');
+                showSnackbar('Profile updated successfully!', 'success');
                 setEditMode(false);
             }
         } catch (err) {
-            setError(err.response?.data?.message || 'Update failed');
+            showSnackbar(err.response?.data?.message || 'Update failed', 'error');
         }
+    };
+
+    const handleImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            setUploadingImage(true);
+            const formData = new FormData();
+            formData.append('profileImage', file);
+            
+            const { data } = await axiosInstance.put(
+                '/employees/profile/image',
+                formData,
+                {
+                    headers: {
+                        'Content-Type': 'multipart/form-data'
+                    }
+                }
+            );
+            
+            if (data.success) {
+                // Force refresh the image by adding timestamp
+                setImagePreview(`http://localhost:5000/api/employees/${profile._id}/profile-image?${Date.now()}`);
+                showSnackbar('Profile image updated successfully!', 'success');
+                
+                // Update the profile data in state if needed
+                if (data.profile) {
+                    setProfile(data.profile);
+                }
+            }
+        } catch (err) {
+            console.error('Upload error:', err);
+            showSnackbar(err.response?.data?.message || 'Image upload failed', 'error');
+        } finally {
+            setUploadingImage(false);
+        }
+    };
+
+    const showSnackbar = (message, severity) => {
+        setSnackbar({
+            open: true,
+            message,
+            severity
+        });
+    };
+
+    const handleCloseSnackbar = () => {
+        setSnackbar(prev => ({ ...prev, open: false }));
     };
 
     if (loadingProfile) {
@@ -179,15 +246,29 @@ const EmployeeProfile = () => {
                             </Box>
 
                             <Box display="flex" flexDirection={{ xs: 'column', sm: 'row' }} gap={2}>
-                                <Box display="flex" justifyContent="center" flexShrink={0}>
+                                <Box display="flex" flexDirection="column" alignItems="center" flexShrink={0}>
                                     <Avatar
-                                        src={profile.profileImage}
+                                        src={imagePreview}
                                         alt="Profile"
                                         sx={{ 
                                             width: 80, 
                                             height: 80,
+                                            mb: 1
                                         }}
                                     />
+                                    <Button
+                                        component="label"
+                                        variant="outlined"
+                                        size="small"
+                                        disabled={uploadingImage}
+                                    >
+                                        {uploadingImage ? 'Uploading...' : 'Change Image'}
+                                        <VisuallyHiddenInput 
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleImageUpload}
+                                        />
+                                    </Button>
                                 </Box>
                                 <Box flex={1}>
                                     <Box sx={{ display: 'flex', mb: 1 }}>
@@ -246,27 +327,37 @@ const EmployeeProfile = () => {
                                     </Box>
                                 </Box>
 
-                                {error && (
-                                    <Typography color="error" variant="body2" mb={2}>
-                                        {error}
-                                    </Typography>
-                                )}
-                                {successMsg && (
-                                    <Typography color="primary" variant="body2" mb={2}>
-                                        {successMsg}
-                                    </Typography>
-                                )}
-
                                 <Box display="flex" flexDirection={{ xs: 'column', sm: 'row' }} gap={2}>
-                                    <Box display="flex" justifyContent="center" flexShrink={0}>
+                                    <Box display="flex" flexDirection="column" alignItems="center" flexShrink={0}>
                                         <Avatar
-                                            src={form.profileImage}
-                                            alt="Profile"
+                                            src={imagePreview}
+                                            alt="Profile Preview"
                                             sx={{ 
                                                 width: 80, 
                                                 height: 80,
+                                                mb: 1
                                             }}
                                         />
+                                        <Button
+                                            component="label"
+                                            variant="outlined"
+                                            size="small"
+                                            disabled={uploadingImage}
+                                        >
+                                            {uploadingImage ? (
+                                                <>
+                                                    <CircularProgress size={16} sx={{ mr: 1 }} />
+                                                    Uploading...
+                                                </>
+                                            ) : (
+                                                'Upload New Image'
+                                            )}
+                                            <VisuallyHiddenInput 
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleImageUpload}
+                                            />
+                                        </Button>
                                     </Box>
                                     <Box flex={1}>
                                         <TextField
@@ -286,14 +377,7 @@ const EmployeeProfile = () => {
                                             margin="dense"
                                             size="small"
                                         />
-                                        {/* <TextField
-                                            label="Employee ID"
-                                            value={form.EmployeeId}
-                                            onChange={handleChange('EmployeeId')}
-                                            fullWidth
-                                            margin="dense"
-                                            size="small"
-                                        /> */}
+                                      
                                         <TextField
                                             label="Department"
                                             value={form.Department}
@@ -352,15 +436,6 @@ const EmployeeProfile = () => {
                                             )}
                                             clearOnEscape
                                         />
-                                        <TextField
-                                            label="Profile Image URL"
-                                            value={form.profileImage}
-                                            onChange={handleChange('profileImage')}
-                                            fullWidth
-                                            margin="dense"
-                                            size="small"
-                                            sx={{ mt: 1 }}
-                                        />
                                     </Box>
                                 </Box>
 
@@ -387,6 +462,21 @@ const EmployeeProfile = () => {
                     )}
                 </Box>
             </Box>
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={6000}
+                onClose={handleCloseSnackbar}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert 
+                    onClose={handleCloseSnackbar} 
+                    severity={snackbar.severity}
+                    sx={{ width: '100%' }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </DashboardLayout>
     );
 };

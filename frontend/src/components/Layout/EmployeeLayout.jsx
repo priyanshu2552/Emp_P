@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Drawer,
@@ -28,6 +28,7 @@ import {
   Menu as MenuIcon,
 } from '@mui/icons-material';
 import { NavLink, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 const drawerWidth = 260;
 
@@ -37,10 +38,10 @@ const SidebarPaper = styled(Paper)(({ theme }) => ({
   height: '100%',
   boxShadow: theme.shadows[4],
   '&::-webkit-scrollbar': {
-    display: 'none', // Hide scrollbar for Chrome, Safari and Opera
+    display: 'none',
   },
-  '-ms-overflow-style': 'none', // Hide scrollbar for IE and Edge
-  scrollbarWidth: 'none', // Hide scrollbar for Firefox
+  msOverflowStyle: 'none',
+  scrollbarWidth: 'none',
 }));
 
 const GlassPaper = styled(Paper)(({ theme }) => ({
@@ -56,6 +57,7 @@ const GlassPaper = styled(Paper)(({ theme }) => ({
 
 const DashboardLayout = ({ children }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [userImage, setUserImage] = useState('');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
@@ -63,8 +65,47 @@ const DashboardLayout = ({ children }) => {
   const user = JSON.parse(localStorage.getItem('user'));
   const role = user?.role || 'employee';
   const name = user?.name || 'User';
-  const image = user?.image || '/default-avatar.png';
+  const userId = user?._id;
+  const profileImage = user?.profileImage || '/default-avatar.png';
 
+  const axiosInstance = axios.create({
+    baseURL: 'http://localhost:5000/api',
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem('token')}`,
+    },
+  });
+
+  useEffect(() => {
+    const fetchUserImage = async () => {
+      if (!userId) return;
+
+      try {
+        // Always use the authorized endpoint
+        const response = await axiosInstance.get(`/employees/${userId}/profile-image`, {
+          responseType: 'blob'
+        });
+
+        if (response.data) {
+          const imageUrl = URL.createObjectURL(response.data);
+          setUserImage(imageUrl);
+        } else {
+          setUserImage('/default-avatar.png');
+        }
+      } catch (error) {
+        console.error('Error fetching user image:', error);
+        setUserImage('/default-avatar.png');
+      }
+    };
+
+    fetchUserImage();
+
+    // Clean up the object URL when component unmounts
+    return () => {
+      if (userImage && userImage.startsWith('blob:')) {
+        URL.revokeObjectURL(userImage);
+      }
+    };
+  }, [userId]);
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
@@ -117,11 +158,11 @@ const DashboardLayout = ({ children }) => {
     <SidebarPaper>
       <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         <Box sx={{ p: 3, textAlign: 'center' }}>
-          <Typography 
-            variant="h5" 
-            sx={{ 
-              fontWeight: 700, 
-              color: 'white', 
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: 700,
+              color: 'white',
               mb: 2,
               fontSize: '1.5rem',
               letterSpacing: '0.5px'
@@ -129,20 +170,25 @@ const DashboardLayout = ({ children }) => {
           >
             {role.charAt(0).toUpperCase() + role.slice(1)} Portal
           </Typography>
-          <Avatar 
-            src={image} 
-            sx={{ 
-              width: 80, 
-              height: 80, 
+          <Avatar
+            src={profileImage}
+            sx={{
+              width: 80,
+              height: 80,
               mb: 2,
               mx: 'auto',
               border: '3px solid rgba(255, 255, 255, 0.3)',
-            }} 
+            }}
+            imgProps={{
+              onError: (e) => {
+                e.target.src = '/default-avatar.png';
+              }
+            }}
           />
-          <Typography 
-            variant="h6" 
-            sx={{ 
-              fontWeight: 600, 
+          <Typography
+            variant="h6"
+            sx={{
+              fontWeight: 600,
               color: 'white',
               fontSize: '1.2rem',
               mb: 0.5
@@ -150,9 +196,9 @@ const DashboardLayout = ({ children }) => {
           >
             {name}
           </Typography>
-          <Typography 
-            variant="subtitle1" 
-            sx={{ 
+          <Typography
+            variant="subtitle1"
+            sx={{
               color: 'rgba(255, 255, 255, 0.8)',
               fontWeight: 500,
               textTransform: 'capitalize',
@@ -169,10 +215,10 @@ const DashboardLayout = ({ children }) => {
         <List sx={{ flexGrow: 1, overflow: 'auto', p: 1, '&::-webkit-scrollbar': { display: 'none' } }}>
           {dashboardOptionsByRole[role]?.map(({ label, to, icon }) => (
             <StyledNavLink to={to} key={label}>
-              <ListItem button>
+              <ListItem>
                 <ListItemIcon sx={{ minWidth: 40, color: 'white' }}>{icon}</ListItemIcon>
-                <ListItemText 
-                  primary={label} 
+                <ListItemText
+                  primary={label}
                   primaryTypographyProps={{
                     fontSize: '0.95rem',
                     fontWeight: 500
@@ -185,27 +231,27 @@ const DashboardLayout = ({ children }) => {
 
         <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.2)', mx: 2 }} />
 
-<ListItem 
-  button 
-  onClick={handleLogout}
-  sx={{ 
-    color: 'rgba(255, 255, 255, 0.8)',
-    '&:hover': {
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    }
-  }}
->
-  <ListItemIcon sx={{ minWidth: 40, color: 'rgba(255, 255, 255, 0.8)' }}>
-    <LogoutIcon />
-  </ListItemIcon>
-  <ListItemText 
-    primary="Logout" 
-    primaryTypographyProps={{
-      fontSize: '0.95rem',
-      fontWeight: 500
-    }}
-  />
-</ListItem>
+        <ListItem
+          onClick={handleLogout}
+          sx={{
+            color: 'rgba(255, 255, 255, 0.8)',
+            '&:hover': {
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              cursor: 'pointer'
+            }
+          }}
+        >
+          <ListItemIcon sx={{ minWidth: 40, color: 'rgba(255, 255, 255, 0.8)' }}>
+            <LogoutIcon />
+          </ListItemIcon>
+          <ListItemText
+            primary="Logout"
+            primaryTypographyProps={{
+              fontSize: '0.95rem',
+              fontWeight: 500
+            }}
+          />
+        </ListItem>
       </Box>
     </SidebarPaper>
   );
@@ -214,7 +260,6 @@ const DashboardLayout = ({ children }) => {
     <Box sx={{ display: 'flex', minHeight: '100vh', background: '#f5f7fa' }}>
       <CssBaseline />
 
-      {/* Mobile App Bar */}
       {isMobile && (
         <Box
           sx={{
@@ -247,7 +292,6 @@ const DashboardLayout = ({ children }) => {
         </Box>
       )}
 
-      {/* Sidebar */}
       <Box
         component="nav"
         sx={{
@@ -260,7 +304,7 @@ const DashboardLayout = ({ children }) => {
           open={mobileOpen}
           onClose={handleDrawerToggle}
           ModalProps={{
-            keepMounted: true, // Better open performance on mobile
+            keepMounted: true,
           }}
           sx={{
             '& .MuiDrawer-paper': {
@@ -282,7 +326,6 @@ const DashboardLayout = ({ children }) => {
         </Drawer>
       </Box>
 
-      {/* Main Content */}
       <Box
         component="main"
         sx={{
