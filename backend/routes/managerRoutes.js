@@ -1,11 +1,15 @@
 const express = require('express');
+const multer = require('multer');
 const router = express.Router();
 const {
-  getManagerProfile,
+  getProfileImage,
   getEmployeesUnderManager,
   getEmployeeDetails,
-  updateManagerProfile, // <-- add this here
+  updateManagerProfile,
+  uploadProfileImage,
+  getManagerProfile
 } = require('../controllers/ManagerControllers/managerProfile');
+
 const policyController = require('../controllers/ManagerControllers/managerPolicy');
 
 const authMiddleware = require('../middlewares/authMiddleware');
@@ -20,15 +24,43 @@ const {
   rejectAppraisal
 } = require('../controllers/ManagerControllers/managerAppraisal');
 
+router.use(authMiddleware.protect);
 
 // All routes are protected — only accessible after login
-router.get('/profile',authMiddleware.protect, getManagerProfile);
-router.get('/employees', authMiddleware.protect, getEmployeesUnderManager);
-router.get('/employee/:id', authMiddleware.protect, getEmployeeDetails);
-router.put('/update-profile', authMiddleware.protect, updateManagerProfile);
+
+//-----imGE uPLOAD PART------
+const upload = multer({
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  }
+});
+// Profile routes
+// In managerRoutes.js
+router.get(
+  '/:userId/profile-image',  // Changed from '/:userId/manager-profile-image'
+  getProfileImage
+);
+
+
+router.get(
+    '/profile',
+    getManagerProfile
+);
+router.put('/update-profile',authMiddleware.protect, updateManagerProfile);
+router.put(
+  '/profile/image',
+  authMiddleware.protect,
+  upload.single('profileImage'),
+  uploadProfileImage
+);
+// Employee management routes
+router.get('/employees', getEmployeesUnderManager);
+router.get('/employee/:id', getEmployeeDetails);
+
 
 router.get('/policies', authMiddleware.protect, policyController.getAllPolicies);
 router.post('/policies/ack', authMiddleware.protect, policyController.markAsRead);
+router.get('/policies/:id/download', authMiddleware.protect, policyController.downloadPolicy);
 
 router.post('/expenses', authMiddleware.protect, adminExpense.submitExpense);
 // Get all expenses for the logged-in user (with filters and pagination)

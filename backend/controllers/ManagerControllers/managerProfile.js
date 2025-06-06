@@ -1,6 +1,6 @@
 const User = require('../../models/User');
 const Appraisal = require('../../models/Appraisal'); // assuming the model name is Appraisal
-
+const sharp = require('sharp'); 
 // GET manager profile + count of employees + pending appraisals
 exports.getManagerProfile = async (req, res) => {
     try {
@@ -29,6 +29,11 @@ exports.getManagerProfile = async (req, res) => {
             employeeCount,
             totalPendingAppraisals: pendingAppraisals,
         });
+        console.log({
+            manager,
+            employeeCount,
+            totalPendingAppraisals: pendingAppraisals,
+        })
     } catch (error) {
         res.status(500).json({ message: 'Server error', error });
     }
@@ -92,4 +97,68 @@ exports.updateManagerProfile = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: 'Error updating profile', error });
     }
+};
+exports.uploadProfileImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'No image file provided'
+      });
+    }
+
+    const userId = req.user._id;
+
+    // Process image with sharp (resize and convert to JPEG)
+    const processedImage = await sharp(req.file.buffer)
+      .resize(500, 500, {
+        fit: 'cover',
+        withoutEnlargement: true
+      })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+
+    // Update user profile with image binary data
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { 
+        profileImage: {
+          data: processedImage,
+          contentType: 'image/jpeg'
+        }
+      },
+      { new: true }
+    ).select('-password -profileImage.data');
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile image uploaded successfully',
+      profile: updatedUser
+    });
+
+  } catch (error) {
+    console.error('Image upload error:', error); // Add detailed logging
+    res.status(500).json({
+      success: false,
+      message: 'Error uploading profile image',
+      error: error.message
+    });
+  }
+};
+exports.getProfileImage = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId)
+      .select('profileImage');
+
+    if (!user || !user.profileImage || !user.profileImage.data) {
+      return res.redirect('/default-avatar.png');
+    }
+
+    res.set('Content-Type', user.profileImage.contentType);
+    res.send(user.profileImage.data);
+
+  } catch (error) {
+    console.error('Error retrieving profile image:', error);
+    res.redirect('/default-avatar.png');
+  }
 };

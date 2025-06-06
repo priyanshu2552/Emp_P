@@ -75,6 +75,7 @@ const EmployeeProfile = () => {
                     });
                     if (data.profile._id) {
                        setImagePreview(`http://localhost:5000/api/employees/${data.profile._id}/profile-image?${Date.now()}`);
+                       console.log(imagePreview);
                     }
                 }
             } catch (err) {
@@ -156,6 +157,7 @@ const EmployeeProfile = () => {
             if (data.success) {
                 // Force refresh the image by adding timestamp
                 setImagePreview(`http://localhost:5000/api/employees/${profile._id}/profile-image?${Date.now()}`);
+                
                 showSnackbar('Profile image updated successfully!', 'success');
                 
                 // Update the profile data in state if needed

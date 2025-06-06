@@ -42,22 +42,24 @@ const AdminPolicies = () => {
 
   const token = localStorage.getItem('token');
 
-  const axiosConfig = {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'multipart/form-data'
-    },
-  };
-
   const fetchPolicies = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/admin/policies', axiosConfig);
+      const res = await axios.get('http://localhost:5000/api/admin/policies', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       setPolicies(res.data.policies);
     } catch (err) {
-      console.error('Error fetching policies:', err);
-      showSnackbar('Failed to fetch policies.', 'error');
+      console.error('Error fetching policies:', err.response?.data || err.message);
+      showSnackbar(
+        err.response?.data?.message || 'Failed to fetch policies',
+        'error'
+      );
     }
   };
+
 
   useEffect(() => {
     fetchPolicies();
@@ -85,18 +87,25 @@ const AdminPolicies = () => {
     if (pdf) formData.append('pdf', pdf);
 
     try {
+      const config = {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`
+        }
+      };
+
       if (selectedPolicy) {
         await axios.put(
           `http://localhost:5000/api/admin/policies/${selectedPolicy._id}`,
           formData,
-          axiosConfig
+          config
         );
         showSnackbar('Policy updated successfully');
       } else {
         await axios.post(
           'http://localhost:5000/api/admin/policies',
           formData,
-          axiosConfig
+          config
         );
         showSnackbar('Policy uploaded successfully');
       }
@@ -105,7 +114,7 @@ const AdminPolicies = () => {
       fetchPolicies();
     } catch (error) {
       console.error('Upload error:', error);
-      showSnackbar('Operation failed', 'error');
+      showSnackbar(error.response?.data?.message || 'Operation failed', 'error');
     }
   };
 
@@ -130,21 +139,42 @@ const AdminPolicies = () => {
   };
 
   const handleDelete = async () => {
-    try {
-      await axios.delete(
-        `http://localhost:5000/api/admin/policies/${policyToDelete._id}`,
-        axiosConfig
-      );
+  try {
+    const response = await axios.delete(
+      `http://localhost:5000/api/admin/policies/${policyToDelete._id}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        }
+      }
+    );
+    
+    if (response.data.success) {
       showSnackbar('Policy deleted successfully');
       fetchPolicies();
-    } catch (error) {
-      console.error('Delete error:', error);
-      showSnackbar('Failed to delete policy', 'error');
+    } else {
+      showSnackbar(response.data.message || 'Delete failed', 'error');
     }
+  } catch (error) {
+    console.error('Delete error:', error);
+    let errorMessage = 'Failed to delete policy';
+    
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      errorMessage = error.response.data.message || 
+                   error.response.statusText || 
+                   errorMessage;
+    } else if (error.request) {
+      // The request was made but no response was received
+      errorMessage = 'No response from server - check backend connection';
+    }
+    
+    showSnackbar(errorMessage, 'error');
+  } finally {
     setOpenDeleteDialog(false);
     setPolicyToDelete(null);
-  };
-
+  }
+};
   const openNewPolicyModal = () => {
     resetForm();
     setOpenModal(true);
@@ -159,6 +189,38 @@ const AdminPolicies = () => {
     setPage(0);
   };
 
+  const handleDownload = async (policyId, policyTitle) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `http://localhost:5000/api/admin/policies/${policyId}/download`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Download failed');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${policyTitle}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error('Download error:', error);
+      showSnackbar(error.message || 'Failed to download file', 'error');
+    }
+  };
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -199,10 +261,10 @@ const AdminPolicies = () => {
                 policies.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((policy) => (
                   <TableRow key={policy._id} hover sx={{ height: '48px' }}>
                     <TableCell sx={{ py: 0.5 }}>{policy.title}</TableCell>
-                    <TableCell sx={{ 
-                      maxWidth: 200, 
-                      whiteSpace: 'nowrap', 
-                      overflow: 'hidden', 
+                    <TableCell sx={{
+                      maxWidth: 200,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       py: 0.5
                     }}>
@@ -213,22 +275,20 @@ const AdminPolicies = () => {
                       <IconButton
                         color="primary"
                         size="small"
-                        href={`http://localhost:5000${policy.fileUrl}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        onClick={() => handleDownload(policy._id, policy.title)}
                       >
                         <Visibility fontSize="small" />
                       </IconButton>
-                      <IconButton 
-                        color="secondary" 
-                        size="small" 
+                      <IconButton
+                        color="secondary"
+                        size="small"
                         onClick={() => handleEdit(policy)}
                       >
                         <Edit fontSize="small" />
                       </IconButton>
-                      <IconButton 
-                        color="error" 
-                        size="small" 
+                      <IconButton
+                        color="error"
+                        size="small"
                         onClick={() => handleDeleteClick(policy)}
                       >
                         <Delete fontSize="small" />

@@ -59,7 +59,7 @@ const ManagerLayout = ({ children }) => {
 
     const user = JSON.parse(localStorage.getItem('user'));
     const name = user?.name || 'Manager';
-    const image = user?.image || '/default-avatar.png';
+    const profileImage = user?.profileImage || '/default-avatar.png';
 
     const handleDrawerToggle = () => {
         setMobileOpen(!mobileOpen);
@@ -113,7 +113,7 @@ const ManagerLayout = ({ children }) => {
                         Manager Portal
                     </Typography>
                     <Avatar
-                        src={image}
+                        src={profileImage}
                         sx={{
                             width: 80,
                             height: 80,

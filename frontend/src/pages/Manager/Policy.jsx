@@ -6,7 +6,9 @@ import {
     Divider,
     Paper,
     CircularProgress,
-    styled
+    styled,
+    Snackbar,
+    Alert
 } from '@mui/material';
 import ManagerLayout from '../../components/Layout/ManagerLayout';
 
@@ -47,8 +49,8 @@ const StatusBadge = styled(Box)(({ theme, read }) => ({
     display: 'inline-block',
     padding: theme.spacing(0.5, 1.5),
     borderRadius: '20px',
-    background: read 
-        ? 'linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)' 
+    background: read
+        ? 'linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)'
         : 'linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%)',
     color: read ? theme.palette.success.dark : theme.palette.error.dark,
     fontWeight: 500,
@@ -60,6 +62,8 @@ const StatusBadge = styled(Box)(({ theme, read }) => ({
 const ManagerPolicyPage = () => {
     const [policies, setPolicies] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [downloading, setDownloading] = useState(false);
+    const [error, setError] = useState(null);
     const token = localStorage.getItem('token');
 
     const fetchPolicies = async () => {
@@ -74,6 +78,7 @@ const ManagerPolicyPage = () => {
             }
         } catch (error) {
             console.error('Error fetching policies:', error);
+            setError('Failed to fetch policies');
         } finally {
             setLoading(false);
         }
@@ -93,7 +98,51 @@ const ManagerPolicyPage = () => {
             if (data.success) fetchPolicies();
         } catch (err) {
             console.error('Failed to mark policy as read:', err);
+            setError('Failed to acknowledge policy');
         }
+    };
+
+    const handleDownload = async (policyId, policyTitle) => {
+        try {
+            setDownloading(true);
+            setError(null);
+
+            const response = await fetch(
+                `${API_BASE}/policies/${policyId}/download`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Download failed');
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `${policyTitle}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            // Mark as read after successful download
+            await markAsRead(policyId);
+
+        } catch (error) {
+            console.error('Download error:', error);
+            setError(error.message || 'Failed to download file');
+        } finally {
+            setDownloading(false);
+        }
+    };
+    const handleCloseError = () => {
+        setError(null);
     };
 
     useEffect(() => {
@@ -102,12 +151,34 @@ const ManagerPolicyPage = () => {
 
     return (
         <ManagerLayout>
-            <Box sx={{ 
+            <Box sx={{
                 p: { xs: 2, md: 3 },
                 maxWidth: '1000px',
                 margin: '0 auto'
             }}>
-                <Typography variant="h6" sx={{ 
+                {/* Error Snackbar */}
+                <Snackbar
+                    open={!!error}
+                    autoHideDuration={6000}
+                    onClose={handleCloseError}
+                    anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+                >
+                    <Alert onClose={handleCloseError} severity="error" sx={{ width: '100%' }}>
+                        {error}
+                    </Alert>
+                </Snackbar>
+
+                {/* Downloading Snackbar */}
+                <Snackbar
+                    open={downloading}
+                    anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+                >
+                    <Alert severity="info" sx={{ width: '100%' }}>
+                        Preparing download...
+                    </Alert>
+                </Snackbar>
+
+                <Typography variant="h6" sx={{
                     fontWeight: 600,
                     mb: 3,
                     color: 'text.primary',
@@ -140,7 +211,7 @@ const ManagerPolicyPage = () => {
                         {policies.map((policy) => (
                             <React.Fragment key={policy._id}>
                                 <PolicyCard>
-                                    <Typography variant="subtitle1" sx={{ 
+                                    <Typography variant="subtitle1" sx={{
                                         fontWeight: 600,
                                         mb: 1,
                                         color: 'primary.main',
@@ -148,27 +219,33 @@ const ManagerPolicyPage = () => {
                                     }}>
                                         {policy.title} <Typography component="span" variant="body2" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>(v{policy.version})</Typography>
                                     </Typography>
-                                    <Typography variant="body2" paragraph sx={{ 
+                                    <Typography variant="body2" paragraph sx={{
                                         color: 'text.secondary',
                                         fontSize: '0.875rem',
                                         lineHeight: 1.5
                                     }}>
                                         {policy.description}
                                     </Typography>
-                                    
+
                                     <DownloadLink
-                                        href={policy.fileUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
+                                        href="#"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            handleDownload(policy._id, policy.title);
+                                        }}
                                         download
                                     >
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M12 16L7 11L8.41 9.59L11 12.17V4H13V12.17L15.59 9.58L17 11L12 16Z" fill="currentColor"/>
-                                            <path d="M19 19H5V15H3V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V15H19V19Z" fill="currentColor"/>
-                                        </svg>
+                                        {downloading ? (
+                                            <CircularProgress size={14} color="inherit" />
+                                        ) : (
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M12 16L7 11L8.41 9.59L11 12.17V4H13V12.17L15.59 9.58L17 11L12 16Z" fill="currentColor" />
+                                                <path d="M19 19H5V15H3V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V15H19V19Z" fill="currentColor" />
+                                            </svg>
+                                        )}
                                         Download Policy Document
                                     </DownloadLink>
-                                    
+
                                     <Box sx={{ display: 'flex', alignItems: 'center', mt: 2 }}>
                                         <StatusBadge read={policy.isRead}>
                                             {policy.isRead ? '✓ Acknowledged' : '✗ Pending Acknowledgement'}
@@ -178,7 +255,7 @@ const ManagerPolicyPage = () => {
                                                 variant="contained"
                                                 size="small"
                                                 onClick={() => markAsRead(policy._id)}
-                                                sx={{ 
+                                                sx={{
                                                     ml: 2,
                                                     textTransform: 'none',
                                                     borderRadius: '20px',

@@ -1,4 +1,3 @@
-// models/Policy.js
 const mongoose = require('mongoose');
 
 const policySchema = new mongoose.Schema({
@@ -7,7 +6,11 @@ const policySchema = new mongoose.Schema({
     required: [true, 'Please provide a title'],
   },
   description: String,
-  fileUrl: {
+  fileId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+  },
+  contentType: {
     type: String,
     required: true,
   },

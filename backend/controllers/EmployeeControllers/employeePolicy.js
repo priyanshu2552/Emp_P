@@ -1,5 +1,7 @@
 const Policy = require('../../models/Policy');
 const PolicyAck = require('../../models/PolicyAck');
+const { GridFSBucket, ObjectId } = require('mongodb');
+const mongoose = require('mongoose');
 
 exports.getAllPolicies = async (req, res) => {
   try {
@@ -43,4 +45,70 @@ exports.markAsRead = async (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to mark as read' });
   }
+};
+
+exports.downloadPolicy = async (req, res) => {
+    try {
+        const policyId = req.params.id;
+        
+        // Verify the policy exists
+        const policy = await Policy.findById(policyId);
+        if (!policy) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Policy not found' 
+            });
+        }
+
+        if (!policy.fileId) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'No file associated with this policy' 
+            });
+        }
+
+        // Get the database connection from mongoose
+        const db = mongoose.connection.db;
+        const bucket = new GridFSBucket(db, { bucketName: 'policies' });
+
+        // Verify the file exists in GridFS
+        const files = await bucket.find({ _id: new ObjectId(policy.fileId) }).toArray();
+        if (files.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'File not found in database' 
+            });
+        }
+
+        // Set proper headers for file download
+        res.set({
+            'Content-Type': files[0].contentType || 'application/octet-stream',
+            'Content-Disposition': `attachment; filename="${encodeURIComponent(policy.title)}.pdf"`,
+            'Content-Length': files[0].length,
+            'Cache-Control': 'no-cache'
+        });
+        
+        // Stream the file
+        const downloadStream = bucket.openDownloadStream(new ObjectId(policy.fileId));
+        
+        downloadStream.on('error', (err) => {
+            console.error('Stream error:', err);
+            if (!res.headersSent) {
+                res.status(500).json({ 
+                    success: false, 
+                    message: 'Error streaming file' 
+                });
+            }
+        });
+        
+        downloadStream.pipe(res);
+        
+    } catch (err) {
+        console.error('Download error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error downloading file',
+            error: err.message 
+        });
+    }
 };
