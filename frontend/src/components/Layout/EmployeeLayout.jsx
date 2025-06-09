@@ -57,7 +57,8 @@ const GlassPaper = styled(Paper)(({ theme }) => ({
 
 const DashboardLayout = ({ children }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [userImage, setUserImage] = useState('');
+
+  const [imageLoading, setImageLoading] = useState(true);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
@@ -67,45 +68,40 @@ const DashboardLayout = ({ children }) => {
   const name = user?.name || 'User';
   const userId = user?._id;
   const profileImage = user?.profileImage || '/default-avatar.png';
-
+  const [userImage, setUserImage] = useState(profileImage);
   const axiosInstance = axios.create({
     baseURL: 'http://localhost:5000/api',
     headers: {
       Authorization: `Bearer ${localStorage.getItem('token')}`,
     },
   });
-
+  // Add this useEffect hook near your other effects
   useEffect(() => {
-    const fetchUserImage = async () => {
-      if (!userId) return;
+  // Set the initial image when component mounts
+  if (user?._id) {
+    const imageUrl = `http://localhost:5000/api/employees/${user._id}/profile-image?${Date.now()}`;
+    setUserImage(imageUrl);
+  }
+}, [user?._id]); // This will run when user._id changes
+// In DashboardLayout component
+// In DashboardLayout component
+useEffect(() => {
+  const handleStorageChange = () => {
+    const updatedUser = JSON.parse(localStorage.getItem('user'));
+    if (updatedUser?._id) {
+      const newImageUrl = `http://localhost:5000/api/employees/${updatedUser._id}/profile-image?${Date.now()}`;
+      setUserImage(newImageUrl);
+    }
+  };
 
-      try {
-        // Always use the authorized endpoint
-        const response = await axiosInstance.get(`/employees/${userId}/profile-image`, {
-          responseType: 'blob'
-        });
+  window.addEventListener('storage', handleStorageChange);
+  
+  return () => {
+    window.removeEventListener('storage', handleStorageChange);
+  };
+}, []);
+  // Clean up the object URL when component unmounts
 
-        if (response.data) {
-          const imageUrl = URL.createObjectURL(response.data);
-          setUserImage(imageUrl);
-        } else {
-          setUserImage('/default-avatar.png');
-        }
-      } catch (error) {
-        console.error('Error fetching user image:', error);
-        setUserImage('/default-avatar.png');
-      }
-    };
-
-    fetchUserImage();
-
-    // Clean up the object URL when component unmounts
-    return () => {
-      if (userImage && userImage.startsWith('blob:')) {
-        URL.revokeObjectURL(userImage);
-      }
-    };
-  }, [userId]);
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
@@ -171,20 +167,21 @@ const DashboardLayout = ({ children }) => {
             {role.charAt(0).toUpperCase() + role.slice(1)} Portal
           </Typography>
           <Avatar
-            src={profileImage}
-            sx={{
-              width: 80,
-              height: 80,
-              mb: 2,
-              mx: 'auto',
-              border: '3px solid rgba(255, 255, 255, 0.3)',
-            }}
-            imgProps={{
-              onError: (e) => {
-                e.target.src = '/default-avatar.png';
-              }
-            }}
-          />
+  src={userImage}
+  sx={{
+    width: 80,
+    height: 80,
+    mb: 2,
+    mx: 'auto',
+    border: '3px solid rgba(255, 255, 255, 0.3)',
+  }}
+  imgProps={{
+    onError: (e) => {
+      e.target.src = '/default-avatar.png';
+    },
+    onLoad: () => setImageLoading(false),
+  }}
+/>
           <Typography
             variant="h6"
             sx={{

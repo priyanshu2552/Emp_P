@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
     Box,
     Typography,
@@ -8,7 +8,10 @@ import {
     CircularProgress,
     styled,
     Snackbar,
-    Alert
+    Alert,
+    Modal,
+    Backdrop,
+    Fade
 } from '@mui/material';
 import EmployeeLayout from '../../components/Layout/EmployeeLayout';
 
@@ -59,11 +62,41 @@ const StatusBadge = styled(Box)(({ theme, read }) => ({
     boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
 }));
 
+const ContentBox = styled(Box)(({ theme }) => ({
+    maxHeight: '60vh',
+    overflowY: 'auto',
+    padding: theme.spacing(2),
+    backgroundColor: theme.palette.background.paper,
+    borderRadius: theme.shape.borderRadius,
+    border: `1px solid ${theme.palette.divider}`,
+    marginBottom: theme.spacing(2),
+}));
+
+const ModalBox = styled(Box)(({ theme }) => ({
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: '80%',
+    maxWidth: '800px',
+    backgroundColor: theme.palette.background.paper,
+    boxShadow: theme.shadows[24],
+    padding: theme.spacing(4),
+    borderRadius: theme.shape.borderRadius,
+    outline: 'none',
+}));
+
 const EmployeePolicyPage = () => {
     const [policies, setPolicies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [downloading, setDownloading] = useState(false);
     const [error, setError] = useState(null);
+    const [openModal, setOpenModal] = useState(false);
+    const [currentPolicy, setCurrentPolicy] = useState(null);
+    const [policyText, setPolicyText] = useState('');
+    const [scrolledEnough, setScrolledEnough] = useState(false);
+    const [textLoading, setTextLoading] = useState(false);
+    const contentRef = useRef(null);
     const token = localStorage.getItem('token');
 
     const fetchPolicies = async () => {
@@ -131,15 +164,45 @@ const EmployeePolicyPage = () => {
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
 
-            // Mark as read after successful download
-            await markAsRead(policyId);
-
         } catch (error) {
             console.error('Download error:', error);
             setError(error.message || 'Failed to download file');
         } finally {
             setDownloading(false);
         }
+    };
+
+    const handleOpenModal = async (policy) => {
+        setCurrentPolicy(policy);
+        setTextLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/policies/${policy._id}/text`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json();
+            if (data.success) {
+                setPolicyText(data.text || 'No text content available for this policy.');
+            } else {
+                setPolicyText('No text content available for this policy.');
+            }
+        } catch (error) {
+            console.error('Error fetching policy text:', error);
+            setPolicyText('Failed to load policy content.');
+        } finally {
+            setTextLoading(false);
+        }
+        setOpenModal(true);
+    };
+
+    const handleCloseModal = () => {
+        setOpenModal(false);
+        setScrolledEnough(false);
+    };
+
+    const handleScroll = (e) => {
+        const { scrollTop, scrollHeight, clientHeight } = e.target;
+        const scrollPercentage = (scrollTop + clientHeight) / scrollHeight;
+        setScrolledEnough(scrollPercentage > 0.75);
     };
 
     const handleCloseError = () => {
@@ -251,34 +314,93 @@ const EmployeePolicyPage = () => {
                                         <StatusBadge read={policy.isRead}>
                                             {policy.isRead ? '✓ Acknowledged' : '✗ Pending Acknowledgement'}
                                         </StatusBadge>
-                                        {!policy.isRead && (
-                                            <Button
-                                                variant="contained"
-                                                size="small"
-                                                onClick={() => markAsRead(policy._id)}
-                                                sx={{
-                                                    ml: 2,
-                                                    textTransform: 'none',
-                                                    borderRadius: '20px',
-                                                    px: 2,
-                                                    py: 0.5,
-                                                    fontSize: '0.75rem',
-                                                    background: 'linear-gradient(135deg, #1976d2 0%, #4dabf5 100%)',
-                                                    '&:hover': {
-                                                        background: 'linear-gradient(135deg, #1565c0 0%, #42a5f5 100%)',
-                                                    }
-                                                }}
-                                            >
-                                                Acknowledge Policy
-                                            </Button>
-                                        )}
                                     </Box>
+
+                                    {!policy.isRead && (
+                                        <Button
+                                            variant="contained"
+                                            size="small"
+                                            onClick={() => handleOpenModal(policy)}
+                                            sx={{
+                                                mt: 2,
+                                                textTransform: 'none',
+                                                borderRadius: '20px',
+                                                px: 2,
+                                                py: 0.5,
+                                                fontSize: '0.75rem',
+                                                background: 'linear-gradient(135deg, #1976d2 0%, #4dabf5 100%)',
+                                                '&:hover': {
+                                                    background: 'linear-gradient(135deg, #1565c0 0%, #42a5f5 100%)',
+                                                }
+                                            }}
+                                        >
+                                            Read and Acknowledge Policy
+                                        </Button>
+                                    )}
                                 </PolicyCard>
                                 <Divider sx={{ my: 1, borderColor: 'divider', opacity: 0.5 }} />
                             </React.Fragment>
                         ))}
                     </Box>
                 )}
+
+                {/* Policy Content Modal */}
+                <Modal
+                    open={openModal}
+                    onClose={handleCloseModal}
+                    closeAfterTransition
+                    BackdropComponent={Backdrop}
+                    BackdropProps={{
+                        timeout: 500,
+                    }}
+                >
+                    <Fade in={openModal}>
+                        <ModalBox>
+                            <Typography variant="h6" gutterBottom>
+                                {currentPolicy?.title}
+                            </Typography>
+                            <ContentBox 
+                                ref={contentRef}
+                                onScroll={handleScroll}
+                            >
+                                {textLoading ? (
+                                    <Box display="flex" justifyContent="center" py={4}>
+                                        <CircularProgress size={24} />
+                                    </Box>
+                                ) : (
+                                    <Typography variant="body2" whiteSpace="pre-wrap">
+                                        {policyText}
+                                    </Typography>
+                                )}
+                            </ContentBox>
+                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                                <Button
+                                    variant="outlined"
+                                    onClick={handleCloseModal}
+                                    sx={{ textTransform: 'none' }}
+                                >
+                                    Close
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    onClick={() => {
+                                        markAsRead(currentPolicy._id);
+                                        handleCloseModal();
+                                    }}
+                                    disabled={!scrolledEnough || textLoading}
+                                    sx={{ textTransform: 'none' }}
+                                >
+                                    Acknowledge Policy
+                                </Button>
+                            </Box>
+                            {!scrolledEnough && (
+                                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                    Please scroll through at least 75% of the content to acknowledge.
+                                </Typography>
+                            )}
+                        </ModalBox>
+                    </Fade>
+                </Modal>
             </Box>
         </EmployeeLayout>
     );

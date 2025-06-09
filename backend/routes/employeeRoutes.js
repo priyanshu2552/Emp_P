@@ -64,6 +64,7 @@ router.get('/policies', authMiddleware.protect, policyController.getAllPolicies)
 router.post('/policies/ack', authMiddleware.protect, policyController.markAsRead);
 // In employeeRoutes.js
 router.get('/policies/:id/download', authMiddleware.protect, policyController.downloadPolicy);
+router.get('/policies/:id/text', authMiddleware.protect, policyController.getPolicyText);
 
 //---------Appraisals---------
 router.post('/appraisal', authMiddleware.protect, createAppraisal);

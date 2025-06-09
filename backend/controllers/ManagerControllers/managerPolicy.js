@@ -112,3 +112,33 @@ exports.downloadPolicy = async (req, res) => {
         });
     }
 };
+exports.getPolicyText = async (req, res) => {
+  try {
+    const policyId = req.params.id;
+    const policy = await Policy.findById(policyId);
+    
+    if (!policy) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Policy not found' 
+      });
+    }
+
+    if (!policy.extractedText) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'No text content available for this policy' 
+      });
+    }
+
+    res.status(200).json({ 
+      success: true, 
+      text: policy.extractedText 
+    });
+  } catch (err) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch policy text' 
+    });
+  }
+};

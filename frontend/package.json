@@ -15,8 +15,11 @@
     "gridfs-stream": "^1.1.1",
     "multer-gridfs-storage": "^5.0.2",
     "notistack": "^3.0.2",
+    "pdf-parse": "^1.1.1",
+    "pdfjs-dist": "^5.3.31",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-pdf": "^9.2.1",
     "react-router-dom": "^7.6.1",
     "react-scripts": "5.0.1",
     "web-vitals": "^2.1.4"

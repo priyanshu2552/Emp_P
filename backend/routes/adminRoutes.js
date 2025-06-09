@@ -1,4 +1,6 @@
 const express = require('express');
+const pdf = require('pdf-parse'); 
+
 const router = express.Router();
 const path = require('path');
 const multer = require('multer');
@@ -118,30 +120,50 @@ router.get('/policies', async (req, res) => {
   }
 });
 
+// Add this at the top with other requires
+
 router.post('/policies', upload.single('pdf'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'PDF file is required' });
     }
 
+    // 1. Upload the file to GridFS
     const fileId = await handleFileUpload(req.file);
+    
+    // 2. Extract text from the PDF
+    let extractedText = '';
+    try {
+      const data = await pdf(req.file.buffer);
+      extractedText = data.text;
+    } catch (err) {
+      console.error('Error extracting text from PDF:', err);
+      // Continue even if text extraction fails
+    }
+
     const { title, description } = req.body;
 
+    // 3. Create the policy with extracted text
     const newPolicy = new Policy({
       title,
       description,
       fileId,
       contentType: req.file.mimetype,
+      extractedText, // Store the extracted text
       createdBy: req.user._id,
     });
 
     await newPolicy.save();
     res.status(201).json({ success: true, policy: newPolicy });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Error uploading policy' });
+    console.error('Error uploading policy:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error uploading policy',
+      error: err.message 
+    });
   }
 });
-
 router.put('/policies/:id', upload.single('pdf'), async (req, res) => {
   try {
     const { id } = req.params;

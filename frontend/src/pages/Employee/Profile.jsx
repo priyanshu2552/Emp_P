@@ -16,15 +16,15 @@ import { styled } from '@mui/material/styles';
 import DashboardLayout from '../../components/Layout/EmployeeLayout';
 
 const VisuallyHiddenInput = styled('input')({
-  clip: 'rect(0 0 0 0)',
-  clipPath: 'inset(50%)',
-  height: 1,
-  overflow: 'hidden',
-  position: 'absolute',
-  bottom: 0,
-  left: 0,
-  whiteSpace: 'nowrap',
-  width: 1,
+    clip: 'rect(0 0 0 0)',
+    clipPath: 'inset(50%)',
+    height: 1,
+    overflow: 'hidden',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    whiteSpace: 'nowrap',
+    width: 1,
 });
 
 const EmployeeProfile = () => {
@@ -74,8 +74,8 @@ const EmployeeProfile = () => {
                         EmployeeId: data.profile.EmployeeId || '',
                     });
                     if (data.profile._id) {
-                       setImagePreview(`http://localhost:5000/api/employees/${data.profile._id}/profile-image?${Date.now()}`);
-                       console.log(imagePreview);
+                        setImagePreview(`http://localhost:5000/api/employees/${data.profile._id}/profile-image?${Date.now()}`);
+                        console.log(imagePreview);
                     }
                 }
             } catch (err) {
@@ -113,7 +113,7 @@ const EmployeeProfile = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         try {
             const updateData = {
                 name: form.name,
@@ -143,30 +143,27 @@ const EmployeeProfile = () => {
             setUploadingImage(true);
             const formData = new FormData();
             formData.append('profileImage', file);
-            
+
             const { data } = await axiosInstance.put(
                 '/employees/profile/image',
                 formData,
-                {
-                    headers: {
-                        'Content-Type': 'multipart/form-data'
-                    }
-                }
+                { headers: { 'Content-Type': 'multipart/form-data' } }
             );
-            
+
             if (data.success) {
-                // Force refresh the image by adding timestamp
-                setImagePreview(`http://localhost:5000/api/employees/${profile._id}/profile-image?${Date.now()}`);
-                
-                showSnackbar('Profile image updated successfully!', 'success');
-                
-                // Update the profile data in state if needed
-                if (data.profile) {
-                    setProfile(data.profile);
-                }
+                // Update local storage
+                localStorage.setItem('user', JSON.stringify(data.profile));
+
+                // Update image preview
+                const newImageUrl = `http://localhost:5000/api/employees/${profile._id}/profile-image?${Date.now()}`;
+                setImagePreview(newImageUrl);
+
+                // Force refresh the layout image
+                window.dispatchEvent(new Event('storage'));
+
+                showSnackbar('Profile image updated!', 'success');
             }
         } catch (err) {
-            console.error('Upload error:', err);
             showSnackbar(err.response?.data?.message || 'Image upload failed', 'error');
         } finally {
             setUploadingImage(false);
@@ -197,7 +194,7 @@ const EmployeeProfile = () => {
 
     return (
         <DashboardLayout>
-            <Box sx={{ 
+            <Box sx={{
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -205,11 +202,11 @@ const EmployeeProfile = () => {
                 minHeight: 'calc(100vh - 64px)',
                 overflow: 'hidden'
             }}>
-                <Box sx={{ 
+                <Box sx={{
                     width: '100%',
                     maxWidth: '800px'
                 }}>
-                    <Typography variant="h6" sx={{ 
+                    <Typography variant="h6" sx={{
                         fontWeight: 600,
                         mb: 2,
                         fontSize: '1.1rem',
@@ -219,14 +216,14 @@ const EmployeeProfile = () => {
                     </Typography>
 
                     {!editMode ? (
-                        <Paper elevation={0} sx={{ 
+                        <Paper elevation={0} sx={{
                             p: 2,
                             mb: 2,
                             border: '1px solid #e0e0e0',
                             borderRadius: '8px'
                         }}>
                             <Box sx={{ mb: 2 }}>
-                                <Box sx={{ 
+                                <Box sx={{
                                     display: 'flex',
                                     justifyContent: 'space-between',
                                     alignItems: 'center',
@@ -236,8 +233,8 @@ const EmployeeProfile = () => {
                                     <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
                                         Personal Information
                                     </Typography>
-                                    <Button 
-                                        variant="outlined" 
+                                    <Button
+                                        variant="outlined"
                                         size="small"
                                         onClick={() => setEditMode(true)}
                                         sx={{ textTransform: 'none' }}
@@ -252,8 +249,8 @@ const EmployeeProfile = () => {
                                     <Avatar
                                         src={imagePreview}
                                         alt="Profile"
-                                        sx={{ 
-                                            width: 80, 
+                                        sx={{
+                                            width: 80,
                                             height: 80,
                                             mb: 1
                                         }}
@@ -265,7 +262,7 @@ const EmployeeProfile = () => {
                                         disabled={uploadingImage}
                                     >
                                         {uploadingImage ? 'Uploading...' : 'Change Image'}
-                                        <VisuallyHiddenInput 
+                                        <VisuallyHiddenInput
                                             type="file"
                                             accept="image/*"
                                             onChange={handleImageUpload}
@@ -310,13 +307,13 @@ const EmployeeProfile = () => {
                         </Paper>
                     ) : (
                         <Box component="form" onSubmit={handleSubmit}>
-                            <Paper elevation={0} sx={{ 
+                            <Paper elevation={0} sx={{
                                 p: 2,
                                 border: '1px solid #e0e0e0',
                                 borderRadius: '8px'
                             }}>
                                 <Box sx={{ mb: 2 }}>
-                                    <Box sx={{ 
+                                    <Box sx={{
                                         display: 'flex',
                                         justifyContent: 'space-between',
                                         alignItems: 'center',
@@ -334,8 +331,8 @@ const EmployeeProfile = () => {
                                         <Avatar
                                             src={imagePreview}
                                             alt="Profile Preview"
-                                            sx={{ 
-                                                width: 80, 
+                                            sx={{
+                                                width: 80,
                                                 height: 80,
                                                 mb: 1
                                             }}
@@ -354,7 +351,7 @@ const EmployeeProfile = () => {
                                             ) : (
                                                 'Upload New Image'
                                             )}
-                                            <VisuallyHiddenInput 
+                                            <VisuallyHiddenInput
                                                 type="file"
                                                 accept="image/*"
                                                 onChange={handleImageUpload}
@@ -379,7 +376,7 @@ const EmployeeProfile = () => {
                                             margin="dense"
                                             size="small"
                                         />
-                                      
+
                                         <TextField
                                             label="Department"
                                             value={form.Department}
@@ -471,8 +468,8 @@ const EmployeeProfile = () => {
                 onClose={handleCloseSnackbar}
                 anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
             >
-                <Alert 
-                    onClose={handleCloseSnackbar} 
+                <Alert
+                    onClose={handleCloseSnackbar}
                     severity={snackbar.severity}
                     sx={{ width: '100%' }}
                 >

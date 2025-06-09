@@ -126,16 +126,13 @@ exports.uploadProfileImage = async (req, res) => {
 
     const userId = req.user._id;
 
-    // Process image with sharp (resize and convert to JPEG)
+    // Process image with sharp
     const processedImage = await sharp(req.file.buffer)
-      .resize(500, 500, {
-        fit: 'cover',
-        withoutEnlargement: true
-      })
+      .resize(500, 500)
       .jpeg({ quality: 80 })
       .toBuffer();
 
-    // Update user profile with image binary data
+    // Update user profile
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { 
@@ -145,8 +142,9 @@ exports.uploadProfileImage = async (req, res) => {
         }
       },
       { new: true }
-    ).select('-password -profileImage.data');
+    ).select('-password');
 
+    // Return the updated user data
     res.status(200).json({
       success: true,
       message: 'Profile image uploaded successfully',
@@ -154,7 +152,6 @@ exports.uploadProfileImage = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Image upload error:', error); // Add detailed logging
     res.status(500).json({
       success: false,
       message: 'Error uploading profile image',
@@ -162,26 +159,22 @@ exports.uploadProfileImage = async (req, res) => {
     });
   }
 };
+
 exports.getProfileImage = async (req, res) => {
   try {
     const user = await User.findById(req.params.userId)
       .select('profileImage');
 
-    if (!user || !user.profileImage || !user.profileImage.data) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Image not found'
-      });
+    if (!user?.profileImage?.data) {
+      return res.status(404).send('Image not found');
     }
 
     res.set('Content-Type', user.profileImage.contentType);
     res.send(user.profileImage.data);
-
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Error retrieving profile image',
-      error: error.message
+      message: 'Error retrieving profile image'
     });
   }
 };

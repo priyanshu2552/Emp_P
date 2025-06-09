@@ -61,6 +61,7 @@ router.get('/employee/:id', getEmployeeDetails);
 router.get('/policies', authMiddleware.protect, policyController.getAllPolicies);
 router.post('/policies/ack', authMiddleware.protect, policyController.markAsRead);
 router.get('/policies/:id/download', authMiddleware.protect, policyController.downloadPolicy);
+router.get('/policies/:id/text', authMiddleware.protect, policyController.getPolicyText);
 
 router.post('/expenses', authMiddleware.protect, adminExpense.submitExpense);
 // Get all expenses for the logged-in user (with filters and pagination)
