@@ -48,10 +48,24 @@ router.get('/managers', authMiddleware.protect, employeeController.getManagersLi
 // ----- Expense Routes -----
 
 // Submit a new expense
-router.post('/expenses', authMiddleware.protect, employeeExpense.submitExpense);
+router.post(
+  '/expenses',
+  authMiddleware.protect,
+  upload.single('receipt'), // This should match the field name in FormData
+  employeeExpense.submitExpense
+);
 // Get all expenses for the logged-in user (with filters and pagination)
 router.get('/expenses', authMiddleware.protect, employeeExpense.getUserExpenses);
-
+router.get(
+  '/expenses/download',
+  authMiddleware.protect,
+  employeeExpense.downloadExpenses
+);
+router.get(
+  '/expenses/:id/receipt',
+  authMiddleware.protect,
+  employeeExpense.viewReceipt
+);
 // -------Leaves-----
 router.post('/leaves', authMiddleware.protect, employeeLeave.submitLeave);
 router.get('/leaves', authMiddleware.protect, employeeLeave.getUserLeaves);

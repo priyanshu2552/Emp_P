@@ -19,22 +19,73 @@ import {
   Paper,
   Chip,
   CircularProgress,
-  TablePagination
+  TablePagination,
+  FormControl,
+  InputLabel,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Snackbar,
+  Alert,
+  Stack,
+  ToggleButton,
+  ToggleButtonGroup
 } from '@mui/material';
-import { Add, Close, Refresh, Receipt, Download, CheckCircle, Cancel, Pending, KeyboardArrowLeft, KeyboardArrowRight } from '@mui/icons-material';
+import {
+  Add,
+  Close,
+  Refresh,
+  Receipt,
+  Download,
+  CheckCircle,
+  Cancel,
+  Pending,
+  FilterAlt,
+  CameraAlt,
+  AttachFile
+} from '@mui/icons-material';
 import DashboardLayout from '../../components/Layout/EmployeeLayout';
+import { styled } from '@mui/material/styles';
 
 const API_BASE = 'http://localhost:5000/api/employees';
+
+const VisuallyHiddenInput = styled('input')({
+  clip: 'rect(0 0 0 0)',
+  clipPath: 'inset(50%)',
+  height: 1,
+  overflow: 'hidden',
+  position: 'absolute',
+  bottom: 0,
+  left: 0,
+  whiteSpace: 'nowrap',
+  width: 1,
+});
 
 const ExpenseTracker = () => {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openModal, setOpenModal] = useState(false);
+  const [openFilterDialog, setOpenFilterDialog] = useState(false);
+  const [openDownloadDialog, setOpenDownloadDialog] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [filePreview, setFilePreview] = useState(null);
+  const [filters, setFilters] = useState({
+    status: '',
+    startDate: '',
+    endDate: ''
+  });
+  const [receiptModal, setReceiptModal] = useState({
+    open: false,
+    receiptUrl: '',
+    receiptType: ''
+  });
+
   const [form, setForm] = useState({
     amount: '',
     description: '',
     category: 'food',
-    receiptUrl: ''
+    receiptFile: null
   });
 
   // Pagination state
@@ -46,7 +97,12 @@ const ExpenseTracker = () => {
   const fetchExpenses = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE}/expenses`, {
+      const queryParams = new URLSearchParams();
+      if (filters.status) queryParams.append('status', filters.status);
+      if (filters.startDate) queryParams.append('startDate', filters.startDate);
+      if (filters.endDate) queryParams.append('endDate', filters.endDate);
+
+      const res = await fetch(`${API_BASE}/expenses?${queryParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -56,7 +112,7 @@ const ExpenseTracker = () => {
         setExpenses(data.expenses.docs || data.expenses);
       }
     } catch (error) {
-      console.error('Failed to fetch expenses:', error);
+      showSnackbar('Failed to fetch expenses', 'error');
     } finally {
       setLoading(false);
     }
@@ -64,32 +120,115 @@ const ExpenseTracker = () => {
 
   useEffect(() => {
     fetchExpenses();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
+const handleFileChange = (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    setForm({ ...form, receiptFile: file });
+
+    // Create preview for images
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setFilePreview(event.target.result);
+      };
+      reader.readAsDataURL(file);
+    } else if (file.type === 'application/pdf') {
+      setFilePreview('pdf');
+    } else {
+      setFilePreview(null);
+    }
+  }
+};
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const formData = new FormData();
+      formData.append('amount', form.amount);
+      formData.append('description', form.description);
+      formData.append('category', form.category);
+      if (form.receiptFile) {
+        formData.append('receipt', form.receiptFile);
+      }
+
       const res = await fetch(`${API_BASE}/expenses`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(form)
+        body: formData
       });
       const data = await res.json();
       if (data.success) {
+        showSnackbar('Expense submitted successfully', 'success');
         setOpenModal(false);
-        setForm({ amount: '', description: '', category: 'food', receiptUrl: '' });
+        setForm({ amount: '', description: '', category: 'food', receiptFile: null });
+        setFilePreview(null);
         fetchExpenses();
       }
     } catch (err) {
-      console.error('Failed to submit expense:', err);
+      showSnackbar('Failed to submit expense', 'error');
     }
+  };
+
+  const handleDownload = async () => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (filters.status) queryParams.append('status', filters.status);
+      if (filters.startDate) queryParams.append('startDate', filters.startDate);
+      if (filters.endDate) queryParams.append('endDate', filters.endDate);
+
+      const res = await fetch(`${API_BASE}/expenses/download?${queryParams.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'expenses.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        showSnackbar('Download started', 'success');
+        setOpenDownloadDialog(false);
+      } else {
+        throw new Error('Failed to download');
+      }
+    } catch (error) {
+      showSnackbar('Failed to download expenses', 'error');
+    }
+  };
+
+  const applyFilters = (newFilters) => {
+    setFilters(newFilters);
+    setOpenFilterDialog(false);
+  };
+
+  const resetFilters = () => {
+    setFilters({
+      status: '',
+      startDate: '',
+      endDate: ''
+    });
+    setOpenFilterDialog(false);
+  };
+
+  const showSnackbar = (message, severity) => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
   };
 
   const getStatusIcon = (status) => {
@@ -115,139 +254,195 @@ const ExpenseTracker = () => {
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
   );
+  const handleViewReceipt = async (expenseId) => {
+    try {
+      const response = await fetch(`${API_BASE}/expenses/${expenseId}/receipt`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch receipt');
+      }
+
+      const contentType = response.headers.get('content-type');
+      const contentDisposition = response.headers.get('content-disposition');
+      let filename = 'receipt';
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+        if (filenameMatch) filename = filenameMatch[1];
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+
+      setReceiptModal({
+        open: true,
+        receiptUrl: url,
+        receiptType: contentType,
+        filename: filename
+      });
+
+    } catch (error) {
+      console.error('Error loading receipt:', error);
+      showSnackbar(error.message || 'Failed to load receipt', 'error');
+    }
+  }
+  const handleCloseReceipt = () => {
+    setReceiptModal({
+      open: false,
+      receiptUrl: null,
+      receiptType: null
+    });
+  };
 
   return (
     <DashboardLayout>
-      <Box sx={{ 
+      <Box sx={{
         display: 'flex',
         flexDirection: 'column',
         p: 2,
         minHeight: 'calc(100vh - 64px)',
         overflow: 'hidden'
       }}>
-        <Box sx={{ 
+        <Box sx={{
           width: '100%',
           maxWidth: '1200px',
           mx: 'auto'
         }}>
           {/* Header Section */}
-          <Box sx={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
+          <Box sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
             mb: 3,
             flexWrap: 'wrap',
             gap: 2
           }}>
-            <Typography variant="h6" sx={{ 
-              fontWeight: 600,
-              fontSize: '1.1rem'
-            }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
               Expense Claims
             </Typography>
             <Box sx={{ display: 'flex', gap: 2 }}>
               <Button
                 variant="outlined"
-                startIcon={<Refresh />}
-                onClick={fetchExpenses}
-                sx={{ 
-                  textTransform: 'none',
-                  '&:hover': {
-                    backgroundColor: 'action.hover',
-                  }
-                }}
+                startIcon={<FilterAlt />}
+                onClick={() => setOpenFilterDialog(true)}
               >
-                Refresh
+                Filter
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<Download />}
+                onClick={() => setOpenDownloadDialog(true)}
+              >
+                Download
               </Button>
               <Button
                 variant="contained"
                 startIcon={<Add />}
                 onClick={() => setOpenModal(true)}
-                sx={{ 
-                  textTransform: 'none',
-                  '&:hover': {
-                    backgroundColor: 'primary.dark',
-                  }
-                }}
               >
                 New Claim
               </Button>
             </Box>
           </Box>
 
-          {/* Summary Cards */}
-          <Box sx={{ 
-            display: 'flex', 
-            gap: 3, 
-            mb: 4, 
-            flexWrap: 'wrap',
-            justifyContent: 'space-between'
-          }}>
-            <Paper sx={{ 
-              p: 3, 
-              flex: 1, 
-              minWidth: '200px', 
-              borderRadius: '8px',
-              border: '1px solid #e0e0e0',
-              '&:hover': {
-                boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
-              }
-            }}>
-              <Typography variant="subtitle2" color="text.secondary">Total Claims</Typography>
-              <Typography variant="h4" sx={{ fontWeight: 700 }}>{expenses.length}</Typography>
-            </Paper>
-            <Paper sx={{ 
-              p: 3, 
-              flex: 1, 
-              minWidth: '200px', 
-              borderRadius: '8px',
-              border: '1px solid #e0e0e0',
-              '&:hover': {
-                boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
-              }
-            }}>
-              <Typography variant="subtitle2" color="text.secondary">Pending</Typography>
-              <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                {expenses.filter(e => e.status === 'pending').length}
+          {/* Filter Dialog */}
+          <Dialog open={openFilterDialog} onClose={() => setOpenFilterDialog(false)}>
+            <DialogTitle>Filter Expenses</DialogTitle>
+            <DialogContent>
+              <Stack spacing={3} sx={{ mt: 2, minWidth: '300px' }}>
+                <FormControl fullWidth>
+                  <InputLabel>Status</InputLabel>
+                  <Select
+                    value={filters.status}
+                    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                    label="Status"
+                  >
+                    <MenuItem value="">All</MenuItem>
+                    <MenuItem value="pending">Pending</MenuItem>
+                    <MenuItem value="approved">Approved</MenuItem>
+                    <MenuItem value="rejected">Rejected</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <TextField
+                  label="Start Date"
+                  type="date"
+                  InputLabelProps={{ shrink: true }}
+                  value={filters.startDate}
+                  onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+                  fullWidth
+                />
+
+                <TextField
+                  label="End Date"
+                  type="date"
+                  InputLabelProps={{ shrink: true }}
+                  value={filters.endDate}
+                  onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+                  fullWidth
+                />
+              </Stack>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={resetFilters}>Reset</Button>
+              <Button onClick={() => applyFilters(filters)} variant="contained">Apply</Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Download Dialog */}
+          <Dialog open={openDownloadDialog} onClose={() => setOpenDownloadDialog(false)}>
+            <DialogTitle>Download Expenses</DialogTitle>
+            <DialogContent>
+              <Typography variant="body1" sx={{ mb: 2 }}>
+                Choose the filters for the expenses you want to download:
               </Typography>
-            </Paper>
-            <Paper sx={{ 
-              p: 3, 
-              flex: 1, 
-              minWidth: '200px', 
-              borderRadius: '8px',
-              border: '1px solid #e0e0e0',
-              '&:hover': {
-                boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
-              }
-            }}>
-              <Typography variant="subtitle2" color="text.secondary">Approved</Typography>
-              <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                {expenses.filter(e => e.status === 'approved').length}
-              </Typography>
-            </Paper>
-          </Box>
+              <Stack spacing={3} sx={{ mt: 2, minWidth: '300px' }}>
+                <FormControl fullWidth>
+                  <InputLabel>Status</InputLabel>
+                  <Select
+                    value={filters.status}
+                    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                    label="Status"
+                  >
+                    <MenuItem value="">All</MenuItem>
+                    <MenuItem value="pending">Pending</MenuItem>
+                    <MenuItem value="approved">Approved</MenuItem>
+                    <MenuItem value="rejected">Rejected</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <TextField
+                  label="Start Date"
+                  type="date"
+                  InputLabelProps={{ shrink: true }}
+                  value={filters.startDate}
+                  onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+                  fullWidth
+                />
+
+                <TextField
+                  label="End Date"
+                  type="date"
+                  InputLabelProps={{ shrink: true }}
+                  value={filters.endDate}
+                  onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+                  fullWidth
+                />
+              </Stack>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setOpenDownloadDialog(false)}>Cancel</Button>
+              <Button onClick={handleDownload} variant="contained">Download</Button>
+            </DialogActions>
+          </Dialog>
 
           {/* Main Table */}
-          <Card sx={{ 
-            borderRadius: '8px', 
-            boxShadow: 'none', 
-            border: '1px solid #e0e0e0',
-            '&:hover': {
-              boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
-            }
-          }}>
-            <Box sx={{ 
-              p: 2,
-              borderBottom: '1px solid #f0f0f0'
-            }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                Recent Expense Claims
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Showing {paginatedExpenses.length} of {expenses.length} entries
-              </Typography>
-            </Box>
+          <Card>
             <CardContent sx={{ p: 0 }}>
               {loading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
@@ -263,53 +458,31 @@ const ExpenseTracker = () => {
                         <TableCell sx={{ fontWeight: 600 }}>Category</TableCell>
                         <TableCell sx={{ fontWeight: 600 }}>Amount</TableCell>
                         <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                        <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Receipt</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {paginatedExpenses.length > 0 ? (
                         paginatedExpenses.map((expense) => (
-                          <TableRow 
-                            key={expense._id} 
-                            hover
-                            sx={{ 
-                              '&:hover': {
-                                backgroundColor: 'action.hover',
-                              }
-                            }}
-                          >
+                          <TableRow key={expense._id} hover>
                             <TableCell>
-                              {new Date(expense.createdAt).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
+                              {new Date(expense.createdAt).toLocaleDateString()}
                             </TableCell>
                             <TableCell>{expense.description}</TableCell>
                             <TableCell sx={{ textTransform: 'capitalize' }}>
-                              <Chip 
-                                label={expense.category} 
-                                size="small" 
-                                sx={{ 
-                                  backgroundColor: '#e3f2fd',
-                                  color: '#1976d2',
-                                  '&:hover': {
-                                    backgroundColor: '#bbdefb',
-                                  }
-                                }} 
-                              />
+                              <Chip label={expense.category} size="small" />
                             </TableCell>
                             <TableCell sx={{ fontWeight: 500 }}>
                               ₹{parseFloat(expense.amount).toFixed(2)}
                             </TableCell>
                             <TableCell>
-                              <Box sx={{ 
-                                display: 'flex', 
+                              <Box sx={{
+                                display: 'flex',
                                 alignItems: 'center',
-                                color: 
+                                color:
                                   expense.status === 'approved' ? 'success.main' :
-                                  expense.status === 'rejected' ? 'error.main' :
-                                  'warning.main'
+                                    expense.status === 'rejected' ? 'error.main' :
+                                      'warning.main'
                               }}>
                                 {getStatusIcon(expense.status)}
                                 <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>
@@ -318,22 +491,14 @@ const ExpenseTracker = () => {
                               </Box>
                             </TableCell>
                             <TableCell>
-                              {expense.receiptUrl && (
-                                <IconButton 
-                                  size="small" 
-                                  href={expense.receiptUrl} 
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  sx={{ 
-                                    color: 'primary.main',
-                                    '&:hover': {
-                                      backgroundColor: 'primary.light',
-                                      color: 'primary.dark'
-                                    }
-                                  }}
+                              {expense.receipt && (
+                                <Button
+                                  size="small"
+                                  onClick={() => handleViewReceipt(expense._id)}
+                                  startIcon={<Receipt />}
                                 >
-                                  <Download fontSize="small" />
-                                </IconButton>
+                                  View
+                                </Button>
                               )}
                             </TableCell>
                           </TableRow>
@@ -358,26 +523,6 @@ const ExpenseTracker = () => {
                       page={page}
                       onPageChange={handleChangePage}
                       onRowsPerPageChange={handleChangeRowsPerPage}
-                      sx={{
-                        borderTop: '1px solid #f0f0f0',
-                        '& .MuiTablePagination-toolbar': {
-                          padding: '0 16px'
-                        }
-                      }}
-                      nextIconButtonProps={{
-                        sx: {
-                          '&:hover': {
-                            backgroundColor: 'action.hover'
-                          }
-                        }
-                      }}
-                      backIconButtonProps={{
-                        sx: {
-                          '&:hover': {
-                            backgroundColor: 'action.hover'
-                          }
-                        }
-                      }}
                     />
                   )}
                 </>
@@ -397,26 +542,11 @@ const ExpenseTracker = () => {
               borderRadius: '8px',
               boxShadow: 24,
               p: 3,
-              outline: 'none',
-              border: '1px solid #e0e0e0'
+              outline: 'none'
             }}>
-              <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                mb: 2 
-              }}>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  New Expense Claim
-                </Typography>
-                <IconButton 
-                  onClick={() => setOpenModal(false)}
-                  sx={{
-                    '&:hover': {
-                      backgroundColor: 'action.hover',
-                    }
-                  }}
-                >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6">New Expense Claim</Typography>
+                <IconButton onClick={() => setOpenModal(false)}>
                   <Close />
                 </IconButton>
               </Box>
@@ -458,50 +588,152 @@ const ExpenseTracker = () => {
                   <MenuItem value="transportation">Transportation</MenuItem>
                   <MenuItem value="other">Other</MenuItem>
                 </Select>
-                <TextField
-                  fullWidth
-                  label="Receipt URL (Optional)"
-                  name="receiptUrl"
-                  value={form.receiptUrl}
-                  onChange={handleChange}
-                  sx={{ mb: 3 }}
-                  InputProps={{
-                    startAdornment: <Receipt sx={{ color: 'text.secondary', mr: 1 }} />
-                  }}
-                />
-                <Box sx={{ 
-                  display: 'flex', 
-                  justifyContent: 'flex-end', 
-                  gap: 2 
-                }}>
-                  <Button 
-                    variant="outlined" 
-                    onClick={() => setOpenModal(false)}
-                    sx={{ 
-                      borderRadius: '8px',
-                      '&:hover': {
-                        backgroundColor: 'action.hover',
-                      }
-                    }}
-                  >
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" sx={{ mb: 1 }}>Receipt (Optional)</Typography>
+                  <Stack direction="row" spacing={2}>
+                    <Button
+                      component="label"
+                      variant="outlined"
+                      startIcon={<AttachFile />}
+                    >
+                      Upload File
+                      <VisuallyHiddenInput
+                        type="file"
+                        accept="image/*,.pdf,.doc,.docx"
+                        onChange={handleFileChange}
+                      />
+                    </Button>
+                    <Button
+                      component="label"
+                      variant="outlined"
+                      startIcon={<CameraAlt />}
+                    >
+                      Take Photo
+                      <VisuallyHiddenInput
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleFileChange}
+                      />
+                    </Button>
+                  </Stack>
+                  {filePreview && (
+                    <Box sx={{ mt: 2 }}>
+                      <img
+                        src={filePreview}
+                        alt="Receipt preview"
+                        style={{ maxWidth: '100%', maxHeight: '200px' }}
+                      />
+                    </Box>
+                  )}
+                  {form.receiptFile && !filePreview && (
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      File selected: {form.receiptFile.name}
+                    </Typography>
+                  )}
+                </Box>
+
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                  <Button variant="outlined" onClick={() => setOpenModal(false)}>
                     Cancel
                   </Button>
-                  <Button 
-                    variant="contained" 
-                    type="submit"
-                    sx={{ 
-                      borderRadius: '8px',
-                      '&:hover': {
-                        backgroundColor: 'primary.dark',
-                      }
-                    }}
-                  >
+                  <Button variant="contained" type="submit">
                     Submit Claim
                   </Button>
                 </Box>
               </form>
             </Box>
           </Modal>
+
+          {/* Receipt View Modal */}
+          <Modal open={receiptModal.open} onClose={handleCloseReceipt}>
+            <Box sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: { xs: '90%', sm: '80%', md: '70%' },
+              maxWidth: '900px',
+              maxHeight: '90vh',
+              bgcolor: 'background.paper',
+              borderRadius: '8px',
+              boxShadow: 24,
+              p: 2,
+              outline: 'none',
+              display: 'flex',
+              flexDirection: 'column'
+            }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6">Receipt</Typography>
+                <IconButton onClick={handleCloseReceipt}>
+                  <Close />
+                </IconButton>
+              </Box>
+              <Divider sx={{ mb: 2 }} />
+              <Box sx={{
+                flex: 1,
+                overflow: 'auto',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                p: 2
+              }}>
+                {receiptModal.receiptUrl && (
+                  receiptModal.receiptType?.startsWith('image/') ? (
+                    <img
+                      src={receiptModal.receiptUrl}
+                      alt="Receipt"
+                      style={{
+                        maxWidth: '100%',
+                        maxHeight: '70vh',
+                        objectFit: 'contain'
+                      }}
+                    />
+                  ) : receiptModal.receiptType === 'application/pdf' ? (
+                    <iframe
+                      src={receiptModal.receiptUrl}
+                      style={{
+                        width: '100%',
+                        height: '70vh',
+                        border: 'none'
+                      }}
+                      title="Expense Receipt"
+                    />
+                  ) : (
+                    <Box sx={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      height: '200px'
+                    }}>
+                      <Typography variant="body1">
+                        Preview not available. <Button
+                          href={receiptModal.receiptUrl}
+                          target="_blank"
+                          download
+                        >
+                          Download File
+                        </Button>
+                      </Typography>
+                    </Box>
+                  )
+                )}
+              </Box>
+            </Box>
+          </Modal>
+
+          {/* Snackbar */}
+          <Snackbar
+            open={snackbar.open}
+            autoHideDuration={6000}
+            onClose={handleCloseSnackbar}
+            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+          >
+            <Alert onClose={handleCloseSnackbar} severity={snackbar.severity}>
+              {snackbar.message}
+            </Alert>
+          </Snackbar>
         </Box>
       </Box>
     </DashboardLayout>

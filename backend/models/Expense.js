@@ -19,9 +19,10 @@ const expenseSchema = new mongoose.Schema({
     type: String,
     default: 'Uncategorized'
   },
-  receiptUrl: {
-    type: String,
-    default: ''
+  receipt: {
+    data: Buffer,
+    contentType: String,
+    filename: String
   },
   status: {
     type: String,
