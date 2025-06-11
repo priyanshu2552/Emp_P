@@ -16,7 +16,6 @@ import {
   MenuItem,
   InputLabel,
   FormControl,
-  Modal,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -24,7 +23,7 @@ import {
   CircularProgress,
   styled
 } from '@mui/material';
-import { Delete, Edit, Add } from '@mui/icons-material';
+import { Delete, Add } from '@mui/icons-material';
 import axios from 'axios';
 
 const ContentContainer = styled(Box)(({ theme }) => ({
@@ -33,7 +32,7 @@ const ContentContainer = styled(Box)(({ theme }) => ({
   boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
   padding: theme.spacing(4),
   [theme.breakpoints.down('md')]: {
-    marginTop: '-100px', // This will pull the content up into the purple area
+    marginTop: '-100px',
     position: 'relative',
     zIndex: 1
   }
@@ -51,8 +50,22 @@ const AdminUsers = () => {
     role: 'employee',
     contact: '',
     address: '',
-    manager: ''
+    manager: '',
+    Department: '',
+    EmployeeId: ''
   });
+  const [errors, setErrors] = useState({});
+
+  const validate = () => {
+    const tempErrors = {};
+    if (!newUser.name) tempErrors.name = 'Name is required';
+    if (!newUser.email) tempErrors.email = 'Email is required';
+    if (!newUser.password) tempErrors.password = 'Password is required';
+    if (!newUser.Department) tempErrors.Department = 'Department is required';
+    if (!newUser.EmployeeId) tempErrors.EmployeeId = 'Employee ID is required';
+    setErrors(tempErrors);
+    return Object.keys(tempErrors).length === 0;
+  };
 
   const fetchUsers = async () => {
     try {
@@ -71,9 +84,11 @@ const AdminUsers = () => {
   };
 
   const handleAddUser = async () => {
+    if (!validate()) return;
+    
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('http://localhost:5000/api/admin/users', newUser, {
+      await axios.post('http://localhost:5000/api/admin/users', newUser, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -87,12 +102,17 @@ const AdminUsers = () => {
         role: 'employee',
         contact: '',
         address: '',
-        manager: ''
+        manager: '',
+        Department: '',
+        EmployeeId: ''
       });
       setOpenModal(false);
       fetchUsers();
     } catch (err) {
       console.error('Failed to add user', err);
+      if (err.response?.data?.message) {
+        setErrors({...errors, form: err.response.data.message});
+      }
     }
   };
 
@@ -113,7 +133,6 @@ const AdminUsers = () => {
   }, [roleFilter]);
 
   return (
-
     <Box sx={{ marginLeft: '3%' }}>
       <Box
         sx={{
@@ -121,7 +140,6 @@ const AdminUsers = () => {
           justifyContent: 'space-between',
           alignItems: 'center',
           mb: 4,
-
         }}
       >
         <Typography variant="h4" fontWeight={600}>
@@ -170,7 +188,8 @@ const AdminUsers = () => {
                 <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Role</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Contact</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Department</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -204,11 +223,9 @@ const AdminUsers = () => {
                       {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                     </Box>
                   </TableCell>
-                  <TableCell>{user.contact || '-'}</TableCell>
+                  <TableCell>{user.Department || '-'}</TableCell>
+                  <TableCell>{user.EmployeeId || '-'}</TableCell>
                   <TableCell>
-                    <IconButton color="primary" size="small">
-                      <Edit fontSize="small" />
-                    </IconButton>
                     <IconButton
                       color="error"
                       size="small"
@@ -228,28 +245,57 @@ const AdminUsers = () => {
       <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Add New User</DialogTitle>
         <DialogContent>
+          {errors.form && (
+            <Box color="error.main" mb={2}>
+              {errors.form}
+            </Box>
+          )}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
             <TextField
-              label="Name"
+              label="Name *"
               fullWidth
               size="small"
               value={newUser.name}
               onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+              error={!!errors.name}
+              helperText={errors.name}
             />
             <TextField
-              label="Email"
+              label="Email *"
               fullWidth
               size="small"
               value={newUser.email}
               onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+              error={!!errors.email}
+              helperText={errors.email}
             />
             <TextField
               type="password"
-              label="Password"
+              label="Password *"
               fullWidth
               size="small"
               value={newUser.password}
               onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+              error={!!errors.password}
+              helperText={errors.password}
+            />
+            <TextField
+              label="Department *"
+              fullWidth
+              size="small"
+              value={newUser.Department}
+              onChange={(e) => setNewUser({ ...newUser, Department: e.target.value })}
+              error={!!errors.Department}
+              helperText={errors.Department}
+            />
+            <TextField
+              label="Employee ID *"
+              fullWidth
+              size="small"
+              value={newUser.EmployeeId}
+              onChange={(e) => setNewUser({ ...newUser, EmployeeId: e.target.value })}
+              error={!!errors.EmployeeId}
+              helperText={errors.EmployeeId}
             />
             <TextField
               label="Contact"
@@ -266,7 +312,7 @@ const AdminUsers = () => {
               onChange={(e) => setNewUser({ ...newUser, address: e.target.value })}
             />
             <FormControl fullWidth size="small">
-              <InputLabel>Role</InputLabel>
+              <InputLabel>Role *</InputLabel>
               <Select
                 value={newUser.role}
                 onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}

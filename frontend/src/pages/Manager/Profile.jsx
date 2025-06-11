@@ -52,9 +52,9 @@ const ManagerProfilePage = () => {
     const [loadingEmployees, setLoadingEmployees] = useState(false);
     const [loadingEmployeeDetails, setLoadingEmployeeDetails] = useState(false);
     const [loadingAppraisalsCount, setLoadingAppraisalsCount] = useState(false);
-    const [uploadingImage, setUploadingImage] = useState(false);
     const [error, setError] = useState('');
     const [imagePreview, setImagePreview] = useState('');
+    const [uploadingImage, setUploadingImage] = useState(false);
 
     const [snackbarState, setSnackbarState] = useState({
         open: false,
@@ -70,15 +70,11 @@ const ManagerProfilePage = () => {
         },
     });
 
-    useEffect(() => {
-        fetchManagerProfile();
-        fetchPendingAppraisalsCount();
-    }, []);
-
     const getProfileImageUrl = (userId) => {
         if (!userId) return '/default-avatar.png';
         return `http://localhost:5000/api/manager/${userId}/profile-image?${Date.now()}`;
     };
+
     const fetchManagerProfile = async () => {
         try {
             setLoadingProfile(true);
@@ -98,7 +94,6 @@ const ManagerProfilePage = () => {
         }
     };
 
-    // Update handleImageUpload
     const handleImageUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -111,39 +106,26 @@ const ManagerProfilePage = () => {
             const { data } = await axiosInstance.put(
                 '/profile/image',
                 formData,
-                {
-                    headers: {
-                        'Content-Type': 'multipart/form-data'
-                    }
-                }
+                { headers: { 'Content-Type': 'multipart/form-data' } }
             );
 
             if (data.success) {
-                showSnackbar('Profile image updated successfully!', 'success');
-                // Force refresh by updating the image URL with new timestamp
+                // Update local storage
+                localStorage.setItem('user', JSON.stringify(data.profile));
+
+                // Update image preview with new timestamp
                 setImagePreview(getProfileImageUrl(manager._id));
-                // Update manager data if needed
-                if (data.profile) {
-                    setManager(prev => ({ ...prev, ...data.profile }));
-                }
+
+                // Force refresh the layout image
+                window.dispatchEvent(new Event('storage'));
+
+                showSnackbar('Profile image updated successfully!', 'success');
             }
         } catch (err) {
             console.error('Upload error:', err);
             showSnackbar(err.response?.data?.message || 'Image upload failed', 'error');
         } finally {
             setUploadingImage(false);
-        }
-    };
-    const fetchPendingAppraisalsCount = async () => {
-        try {
-            setLoadingAppraisalsCount(true);
-            const res = await axiosInstance.get('/appraisal');
-            const pending = res.data.filter(a => a.status === 'submitted').length;
-            setTotalPendingAppraisals(pending);
-        } catch (err) {
-            setTotalPendingAppraisals(0);
-        } finally {
-            setLoadingAppraisalsCount(false);
         }
     };
 
@@ -204,6 +186,19 @@ const ManagerProfilePage = () => {
         }
     };
 
+    const fetchPendingAppraisalsCount = async () => {
+        try {
+            setLoadingAppraisalsCount(true);
+            const res = await axiosInstance.get('/appraisal');
+            const pending = res.data.filter(a => a.status === 'submitted').length;
+            setTotalPendingAppraisals(pending);
+        } catch (err) {
+            setTotalPendingAppraisals(0);
+        } finally {
+            setLoadingAppraisalsCount(false);
+        }
+    };
+
     const goToAppraisals = () => {
         navigate('/manager/appraisal');
     };
@@ -220,6 +215,10 @@ const ManagerProfilePage = () => {
         setSnackbarState(prev => ({ ...prev, open: false }));
     };
 
+    useEffect(() => {
+        fetchManagerProfile();
+        fetchPendingAppraisalsCount();
+    }, []);
     return (
         <ManagerLayout>
             <Box sx={{ p: 3 }}>
@@ -242,16 +241,16 @@ const ManagerProfilePage = () => {
                         <Grid container spacing={3}>
                             <Grid item xs={12} md={3}>
                                 <Box display="flex" flexDirection="column" alignItems="center">
-                                    <Avatar
-                                        src={imagePreview}
-                                        sx={{ width: 150, height: 150, mb: 2 }}
-                                        imgProps={{
-                                            onError: (e) => {
-                                                e.target.onerror = null;
-                                                e.target.src = '/default-avatar.png';
-                                            }
-                                        }}
-                                    />
+                                   <Avatar
+    src={imagePreview}
+    sx={{ width: 150, height: 150, mb: 2 }}
+    imgProps={{
+        onError: (e) => {
+            e.target.onerror = null;
+            e.target.src = '/default-avatar.png';
+        }
+    }}
+/>
                                     <Typography variant="h6">{manager.name}</Typography>
                                     <Typography color="textSecondary">{manager.role}</Typography>
                                 </Box>
@@ -289,16 +288,16 @@ const ManagerProfilePage = () => {
                         <Grid container spacing={3}>
                             <Grid item xs={12} md={3}>
                                 <Box display="flex" flexDirection="column" alignItems="center">
-                                    <Avatar
-                                        src={imagePreview}
-                                        sx={{ width: 150, height: 150, mb: 2 }}
-                                        imgProps={{
-                                            onError: (e) => {
-                                                e.target.onerror = null;
-                                                e.target.src = '/default-avatar.png';
-                                            }
-                                        }}
-                                    />
+                                   <Avatar
+    src={imagePreview}
+    sx={{ width: 150, height: 150, mb: 2 }}
+    imgProps={{
+        onError: (e) => {
+            e.target.onerror = null;
+            e.target.src = '/default-avatar.png';
+        }
+    }}
+/>
                                     <Button
                                         component="label"
                                         variant="outlined"
