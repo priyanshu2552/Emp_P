@@ -11,7 +11,6 @@ const {
 } = require('../controllers/ManagerControllers/managerProfile');
 
 const policyController = require('../controllers/ManagerControllers/managerPolicy');
-
 const authMiddleware = require('../middlewares/authMiddleware');
 const uploadMiddleware = require('../middlewares/uploadMiddleware');
 const managerExpense = require('../controllers/ManagerControllers/managerExpense');
@@ -27,64 +26,54 @@ const adminExpense = require('../controllers/ManagerControllers/managerExpense')
 
 router.use(authMiddleware.protect);
 
-// All routes are protected — only accessible after login
-
-//-----imGE uPLOAD PART------
+// ----- Image Upload -----
 const upload = multer({
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB limit
   }
 });
-// Profile routes
-// In managerRoutes.js
-router.get(
-  '/:userId/profile-image',  // Changed from '/:userId/manager-profile-image'
-  getProfileImage
-);
 
-
-router.get(
-    '/profile',
-    getManagerProfile
-);
-router.put('/update-profile',authMiddleware.protect, updateManagerProfile);
+// ----- Profile Routes -----
+router.get('/:userId/profile-image', getProfileImage);
+router.get('/profile', getManagerProfile);
+router.put('/update-profile', updateManagerProfile);
 router.put(
   '/profile/image',
-  authMiddleware.protect,
   upload.single('profileImage'),
   uploadProfileImage
 );
-// Employee management routes
+
+// ----- Employee Management -----
 router.get('/employees', getEmployeesUnderManager);
 router.get('/employee/:id', getEmployeeDetails);
 
+// ----- Policies -----
+router.get('/policies', policyController.getAllPolicies);
+router.post('/policies/ack', policyController.markAsRead);
+router.get('/policies/:id/download', policyController.downloadPolicy);
+router.get('/policies/:id/text', policyController.getPolicyText);
 
-router.get('/policies', authMiddleware.protect, policyController.getAllPolicies);
-router.post('/policies/ack', authMiddleware.protect, policyController.markAsRead);
-router.get('/policies/:id/download', authMiddleware.protect, policyController.downloadPolicy);
-router.get('/policies/:id/text', authMiddleware.protect, policyController.getPolicyText);
+// ----- Expense Management -----
+router.get('/expenses/team', managerExpense.getTeamExpenses);
+router.put('/expenses/review/:expenseId', managerExpense.reviewExpense);
+router.get('/expenses/:expenseId/receipt', managerExpense.getExpenseReceipt);
 
-router.get('/expenses/team', authMiddleware.protect, managerExpense.getTeamExpenses);
-router.put('/expenses/review/:expenseId', authMiddleware.protect, managerExpense.reviewExpense);
-router.get(
-  '/expenses/:expenseId/receipt',  // Changed from '/expenses/receipt/:expenseId'
-  authMiddleware.protect,
-  managerExpense.getExpenseReceipt
-);
+// ----- LEAVE MANAGEMENT -----
+router.post('/leaves', managerLeave.submitLeave); // Manager submitting their own leave
+router.get('/leaves', managerLeave.getUserLeaves); // Manager viewing own leaves
+router.get('/team-leaves', managerLeave.getTeamLeaves); // Manager viewing team pending leaves
+router.post('/leaves/:id/review', managerLeave.reviewLeave); // Approve/Reject team leaves
+router.get('/leave-allocation', managerLeave.getLeaveAllocation); // Get leave allocation
 
-router.post('/leaves', authMiddleware.protect, managerLeave.submitLeave);
-router.get('/leaves', authMiddleware.protect, managerLeave.getUserLeaves);
+// ----- Reviews -----
+router.get('/employees', getEmployeesForManager);
+router.post('/review/submit', submitReview);
+router.get('/reviews', getManagerReviews);
+router.get('/employee/details/:id', getEmployeeDetailsById);
 
-
-
-router.get('/employees', authMiddleware.protect, getEmployeesForManager);
-router.post('/review/submit', authMiddleware.protect, submitReview);
-router.get('/reviews', authMiddleware.protect, getManagerReviews);
-router.get('/employee/details/:id', authMiddleware.protect, getEmployeeDetailsById);
-
-
-router.get('/appraisal', authMiddleware.protect, getManagerAppraisals); // no managerId param
-router.put('/appraisal/review/:id', authMiddleware.protect, reviewAppraisal);
-router.put('/appraisal/reject/:id', authMiddleware.protect, rejectAppraisal);
+// ----- Appraisals -----
+router.get('/appraisal', getManagerAppraisals);
+router.put('/appraisal/review/:id', reviewAppraisal);
+router.put('/appraisal/reject/:id', rejectAppraisal);
 
 module.exports = router;

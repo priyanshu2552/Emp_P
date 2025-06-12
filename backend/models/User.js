@@ -24,9 +24,12 @@ const userSchema = new mongoose.Schema({
   },
   Department: {
     type: String,
+    required: [true, 'Please provide a department'],
   },
   EmployeeId: {
     type: String,
+    required: [true, 'Please provide an employee ID'],
+    unique: true,
   },
   manager: {
     type: mongoose.Schema.Types.ObjectId,

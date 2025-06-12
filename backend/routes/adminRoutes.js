@@ -1,18 +1,25 @@
 const express = require('express');
 const pdf = require('pdf-parse'); 
-
 const router = express.Router();
 const path = require('path');
 const multer = require('multer');
 const crypto = require('crypto');
 const { protect, authorize } = require('../middlewares/authMiddleware');
 const { GridFsStorage } = require('multer-gridfs-storage');
+
 // Controllers
 const adminAppraisalController = require('../controllers/AdminControllers/adminAppraisal');
 const { getAdminDashboardData } = require('../controllers/AdminControllers/adminDashboard');
 const { getUsers, addUser, deleteUser } = require('../controllers/AdminControllers/adminManageUser');
 const expenseController = require('../controllers/AdminControllers/adminExpense');
-const { getAllLeaves, updateLeaveStatus } = require('../controllers/AdminControllers/adminLeave');
+const {
+  getAllLeaves,
+  processLeaveRequest,
+  getLeavePolicy,
+  updateLeavePolicy,
+  resetYearlyAllocations
+} = require('../controllers/AdminControllers/adminLeave');
+
 const { addPolicy, getAllPolicies, updatePolicy, deletePolicy, getPolicyFile } = require('../controllers/AdminControllers/adminPolicies');
 const weeklyReviewController = require('../controllers/AdminControllers/adminWeeklyReview');
 const { MongoClient, ObjectId } = require('mongodb');
@@ -27,7 +34,8 @@ async function connectDB() {
   db = client.db();
   bucket = new GridFSBucket(db, { bucketName: 'policies' });
 }
-
+router.use(protect);
+router.use(authorize('admin'));
 connectDB().catch(console.error);
 
 // Middleware to handle file uploads
@@ -97,6 +105,7 @@ async function handleFileDelete(fileId) {
     });
   });
 }
+
 // 🔐 Middleware to protect all admin routes
 router.use(protect);
 router.use(authorize('admin'));
@@ -106,21 +115,19 @@ router.use(authorize('admin'));
 // ==============================
 router.get('/policies', async (req, res) => {
   try {
-    console.log('Fetching policies...'); // Debug log
+    console.log('Fetching policies...');
     const policies = await Policy.find().populate('createdBy', 'name email');
-    console.log('Policies found:', policies.length); // Debug log
+    console.log('Policies found:', policies.length);
     res.json({ success: true, policies });
   } catch (err) {
-    console.error('Error fetching policies:', err); // Detailed error log
+    console.error('Error fetching policies:', err);
     res.status(500).json({ 
       success: false, 
       message: 'Server error',
-      error: err.message // Include error message in response
+      error: err.message
     });
   }
 });
-
-// Add this at the top with other requires
 
 router.post('/policies', upload.single('pdf'), async (req, res) => {
   try {
@@ -128,28 +135,24 @@ router.post('/policies', upload.single('pdf'), async (req, res) => {
       return res.status(400).json({ success: false, message: 'PDF file is required' });
     }
 
-    // 1. Upload the file to GridFS
     const fileId = await handleFileUpload(req.file);
     
-    // 2. Extract text from the PDF
     let extractedText = '';
     try {
       const data = await pdf(req.file.buffer);
       extractedText = data.text;
     } catch (err) {
       console.error('Error extracting text from PDF:', err);
-      // Continue even if text extraction fails
     }
 
     const { title, description } = req.body;
 
-    // 3. Create the policy with extracted text
     const newPolicy = new Policy({
       title,
       description,
       fileId,
       contentType: req.file.mimetype,
-      extractedText, // Store the extracted text
+      extractedText,
       createdBy: req.user._id,
     });
 
@@ -164,6 +167,7 @@ router.post('/policies', upload.single('pdf'), async (req, res) => {
     });
   }
 });
+
 router.put('/policies/:id', upload.single('pdf'), async (req, res) => {
   try {
     const { id } = req.params;
@@ -196,7 +200,6 @@ router.put('/policies/:id', upload.single('pdf'), async (req, res) => {
 
 router.delete('/policies/:id', protect, authorize('admin'), async (req, res) => {
   try {
-    // Validate the ID format first
     if (!ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ 
         success: false, 
@@ -212,17 +215,14 @@ router.delete('/policies/:id', protect, authorize('admin'), async (req, res) => 
       });
     }
 
-    // Delete the file from GridFS if it exists
     if (policy.fileId) {
       try {
         await bucket.delete(new ObjectId(policy.fileId));
       } catch (err) {
         console.warn('Error deleting file from GridFS:', err.message);
-        // Continue with policy deletion even if file deletion fails
       }
     }
 
-    // Delete the policy document
     await Policy.findByIdAndDelete(req.params.id);
     
     res.json({ 
@@ -239,8 +239,6 @@ router.delete('/policies/:id', protect, authorize('admin'), async (req, res) => 
   }
 });
 
-// In your adminRoutes.js
-// In your adminRoutes.js
 router.get('/policies/:id/download', protect, authorize('admin'), async (req, res) => {
   try {
     const policy = await Policy.findById(req.params.id);
@@ -258,7 +256,6 @@ router.get('/policies/:id/download', protect, authorize('admin'), async (req, re
       });
     }
 
-    // Use the existing db connection instead of creating a new one
     const bucket = new GridFSBucket(db, { bucketName: 'policies' });
     
     const files = await bucket.find({ _id: new ObjectId(policy.fileId) }).toArray();
@@ -290,9 +287,6 @@ router.get('/policies/:id/download', protect, authorize('admin'), async (req, re
     });
   }
 });
-// 🔐 Middleware to protect all admin routes
-router.use(protect);
-router.use(authorize('admin'));
 
 // ==============================
 // User Management
@@ -313,20 +307,13 @@ router.put('/expenses/:id', expenseController.updateExpenseStatus);
 router.get('/dashboard', getAdminDashboardData);
 
 // ==============================
-// Leave Management
+// Leave Management (Updated Routes)
 // ==============================
 router.get('/leaves', getAllLeaves);
-router.put('/leaves/:id', updateLeaveStatus);
-
-
-// ==============================
-// Policy Management
-// ==============================
-// router.get('/policies/:id/download', getPolicyFile);
-// router.get('/policies', getAllPolicies);
-// router.post('/policies', upload.single('pdf'), addPolicy);
-// router.put('/policies/:id', upload.single('pdf'), updatePolicy);
-// router.delete('/policies/:id', deletePolicy);
+router.put('/leaves/:id/process', processLeaveRequest);
+router.get('/policy', getLeavePolicy);
+router.put('/policy', updateLeavePolicy);
+router.post('/reset-allocations', resetYearlyAllocations);
 
 // ==============================
 // Appraisal Management

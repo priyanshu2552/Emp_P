@@ -1,7 +1,8 @@
 const express = require('express');
 const dotenv = require('dotenv');
 dotenv.config();
-
+const cron = require('node-cron');
+const { resetYearlyLeaves, adjustMidYearLeaves } = require('./utils/leaveUtils');
 const connectDB = require('./config/db');
 const cors = require('cors');
 const employeeRoutes = require('./routes/employeeRoutes');
@@ -9,6 +10,15 @@ const managerRoutes = require('./routes/managerRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 
 connectDB();
+// crn setup
+cron.schedule('0 0 1 1 *', () => {
+  console.log('Running yearly leave reset...');
+  resetYearlyLeaves();
+});
+cron.schedule('0 0 1 7 *', () => {
+  console.log('Running mid-year leave adjustment...');
+  adjustMidYearLeaves();
+});
 
 const app = express();
 app.use(cors({

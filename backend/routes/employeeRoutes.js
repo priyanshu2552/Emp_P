@@ -4,7 +4,8 @@ const employeeController = require('../controllers/EmployeeControllers/employeeP
 const employeeExpense = require('../controllers/EmployeeControllers/employeeExpense');
 const authMiddleware = require('../middlewares/authMiddleware');
 const uploadMiddleware = require('../middlewares/uploadMiddleware');
-const employeeLeave = require('../controllers/EmployeeControllers/employeeLeave');
+const employeeLeaveController = require('../controllers/EmployeeControllers/employeeLeave');
+// using the updated one
 const employeeReview = require('../controllers/EmployeeControllers/employeeReview');
 const policyController = require('../controllers/EmployeeControllers/employeePolicy');
 const { createAppraisal, getMyAppraisals } = require('../controllers/EmployeeControllers/appraisalController');
@@ -27,7 +28,6 @@ router.get(
   '/:userId/profile-image',
   employeeController.getProfileImage
 );
-
 
 // ----- Employee Profile Routes -----
 
@@ -66,23 +66,30 @@ router.get(
   authMiddleware.protect,
   employeeExpense.viewReceipt
 );
-// -------Leaves-----
-router.post('/leaves', authMiddleware.protect, employeeLeave.submitLeave);
-router.get('/leaves', authMiddleware.protect, employeeLeave.getUserLeaves);
+
+// ------- Updated Leave Routes --------
+router.get('/leave/balance', authMiddleware.protect, employeeLeaveController.getLeaveBalance);
+
+// Get leave history
+router.get('/leave/history', authMiddleware.protect, employeeLeaveController.getLeaveHistory);
+
+// Create leave request
+router.post('/leave/request', authMiddleware.protect, employeeLeaveController.createLeaveRequest);
+
+// Cancel leave request
+router.put('/leave/request/:id/cancel', authMiddleware.protect, employeeLeaveController.cancelLeaveRequest);
 
 // ---------Review-----
 router.get('/reviews', authMiddleware.protect, employeeReview.getEmployeeReviews);
 
-//---------Pilicies------
+//---------Policies------
 router.get('/policies', authMiddleware.protect, policyController.getAllPolicies);
 router.post('/policies/ack', authMiddleware.protect, policyController.markAsRead);
-// In employeeRoutes.js
 router.get('/policies/:id/download', authMiddleware.protect, policyController.downloadPolicy);
 router.get('/policies/:id/text', authMiddleware.protect, policyController.getPolicyText);
 
 //---------Appraisals---------
 router.post('/appraisal', authMiddleware.protect, createAppraisal);
 router.get('/appraisal', authMiddleware.protect, getMyAppraisals);
-
 
 module.exports = router;

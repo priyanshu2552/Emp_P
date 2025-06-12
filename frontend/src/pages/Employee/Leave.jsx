@@ -1,491 +1,357 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Typography,
-  Button,
-  Card,
-  CardContent,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  TextField,
-  Select,
-  MenuItem,
-  Modal,
-  Divider,
-  IconButton,
-  Paper,
-  Chip,
-  CircularProgress,
-  TablePagination,
-  TextareaAutosize
-} from '@mui/material';
-import { Add, Close, Refresh, CheckCircle, Cancel, Pending } from '@mui/icons-material';
-import DashboardLayout from '../../components/Layout/EmployeeLayout';
-const API_BASE = 'http://localhost:5000/api/employees';
+import { Container, Row, Col, Card, Button, Form, Modal, Badge, Spinner, Tab, Tabs } from 'react-bootstrap';
+import axios from 'axios';
+import { toast } from 'react-toastify';
+import { format } from 'date-fns';
 
-const Leave = () => {
-  const [leaves, setLeaves] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [openModal, setOpenModal] = useState(false);
-  const [form, setForm] = useState({
+const EmployeeLeaveManagement = () => {
+  const [leaveBalance, setLeaveBalance] = useState(null);
+  const [leaveHistory, setLeaveHistory] = useState([]);
+  const [loading, setLoading] = useState({
+    balance: true,
+    history: true
+  });
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('all');
+  const [formData, setFormData] = useState({
     startDate: '',
     endDate: '',
     leaveType: 'casual',
-    reason: ''
+    reason: '',
+    isHalfDay: false
   });
-
-  // Pagination state
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
-
-  const token = localStorage.getItem('token');
-
-  const fetchLeaves = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch(`${API_BASE}/leaves`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      const data = await res.json();
-      if (data.success) {
-        setLeaves(data.leaves);
-      } else {
-        console.error(data.message);
+  const API_BASE_URL = 'http://localhost:5000/api';
+  // Fetch leave balance
+  const fetchLeaveBalance = async () => {
+  try {
+    setLoading(prev => ({ ...prev, balance: true }));
+    const { data } = await axios.get(`${API_BASE_URL}/employees/leave/balance`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`
       }
-    } catch (error) {
-      console.error('Failed to fetch leaves:', error);
-    } finally {
-      setLoading(false);
+    });
+    setLeaveBalance(data.data);
+  } catch (error) {
+    toast.error('Failed to fetch leave balance');
+  } finally {
+    setLoading(prev => ({ ...prev, balance: false }));
+  }
+};
+
+// Fetch leave history
+const fetchLeaveHistory = async () => {
+  try {
+    setLoading(prev => ({ ...prev, history: true }));
+    const { data } = await axios.get(`${API_BASE_URL}/employees/leave/history`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`
+      },
+      params: { 
+        status: activeTab === 'all' ? undefined : activeTab 
+      }
+    });
+    setLeaveHistory(data.data);
+  } catch (error) {
+    toast.error('Failed to fetch leave history');
+  } finally {
+    setLoading(prev => ({ ...prev, history: false }));
+  }
+};
+
+  useEffect(() => {
+    fetchLeaveBalance();
+    fetchLeaveHistory();
+  }, [activeTab]);
+
+  // Handle form input changes
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData({
+      ...formData,
+      [name]: type === 'checkbox' ? checked : value
+    });
+  };
+
+  // Submit leave request
+  const handleSubmitRequest = async () => {
+  try {
+    // Validate dates
+    if (!formData.startDate) {
+      toast.error('Please select a start date');
+      return;
     }
-  };
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+    if (!formData.isHalfDay && !formData.endDate) {
+      toast.error('Please select an end date');
+      return;
+    }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch(`${API_BASE}/leaves`, {
-        method: 'POST',
+    // Prepare request data
+    const requestData = {
+      ...formData,
+      startDate: new Date(formData.startDate).toISOString(),
+      endDate: formData.isHalfDay 
+        ? new Date(formData.startDate).toISOString()
+        : new Date(formData.endDate).toISOString()
+    };
+
+    const response = await axios.post(
+      `${API_BASE_URL}/employees/leave/request`,
+      requestData,
+      {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(form)
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        setOpenModal(false);
-        setForm({ startDate: '', endDate: '', leaveType: 'casual', reason: '' });
-        fetchLeaves();
-      } else {
-        alert(data.message);
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
       }
-    } catch (error) {
-      console.error('Failed to submit leave:', error);
-    }
-  };
+    );
 
-  // Handle pagination
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
+    toast.success('Leave request submitted successfully');
+    setShowRequestModal(false);
+    fetchLeaveBalance();
+    fetchLeaveHistory();
+  } catch (error) {
+    console.error('Error details:', error.response?.data);
+    toast.error(error.response?.data?.message || 'Failed to submit leave request');
+  }
+};
+  // Cancel leave request
+  const handleCancelRequest = async (id) => {
+  try {
+    await axios.put(
+      `${API_BASE_URL}/employees/leave/request/${id}/cancel`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      }
+    );
+    toast.success('Leave request cancelled');
+    fetchLeaveHistory();
+  } catch (error) {
+    toast.error(error.response?.data?.message || 'Failed to cancel leave request');
+  }
+};
 
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  // Calculate paginated leaves
-  const paginatedLeaves = leaves.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'approved': return <CheckCircle color="success" sx={{ fontSize: '1rem', mr: 0.5 }} />;
-      case 'rejected': return <Cancel color="error" sx={{ fontSize: '1rem', mr: 0.5 }} />;
-      default: return <Pending color="warning" sx={{ fontSize: '1rem', mr: 0.5 }} />;
-    }
+  // Status badge component
+  const StatusBadge = ({ status }) => {
+    const variants = {
+      pending: 'warning',
+      approved: 'success',
+      rejected: 'danger',
+      cancelled: 'secondary'
+    };
+    return <Badge bg={variants[status]}>{status.toUpperCase()}</Badge>;
   };
 
   return (
-    <DashboardLayout>
-    <Box sx={{ 
-      display: 'flex',
-      flexDirection: 'column',
-      p: 2,
-      minHeight: 'calc(100vh - 64px)',
-      overflow: 'hidden'
-    }}>
-      <Box sx={{ 
-        width: '100%',
-        maxWidth: '1200px',
-        mx: 'auto'
-      }}>
-        {/* Header Section */}
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          mb: 3,
-          flexWrap: 'wrap',
-          gap: 2
-        }}>
-          <Typography variant="h6" sx={{ 
-            fontWeight: 600,
-            fontSize: '1.1rem'
-          }}>
-            Leave Management
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button
-              variant="outlined"
-              startIcon={<Refresh />}
-              onClick={fetchLeaves}
-              sx={{ 
-                textTransform: 'none',
-                '&:hover': {
-                  backgroundColor: 'action.hover',
-                }
-              }}
-            >
-              Refresh
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<Add />}
-              onClick={() => setOpenModal(true)}
-              sx={{ 
-                textTransform: 'none',
-                '&:hover': {
-                  backgroundColor: 'primary.dark',
-                }
-              }}
-            >
-              New Request
-            </Button>
-          </Box>
-        </Box>
+    <Container className="mt-4">
+      <h1 className="mb-4">My Leave Management</h1>
 
-        {/* Summary Cards */}
-        <Box sx={{ 
-          display: 'flex', 
-          gap: 3, 
-          mb: 4, 
-          flexWrap: 'wrap',
-          justifyContent: 'space-between'
-        }}>
-          <Paper sx={{ 
-            p: 3, 
-            flex: 1, 
-            minWidth: '200px', 
-            borderRadius: '8px',
-            border: '1px solid #e0e0e0',
-            '&:hover': {
-              boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
-            }
-          }}>
-            <Typography variant="subtitle2" color="text.secondary">Total Requests</Typography>
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>{leaves.length}</Typography>
-          </Paper>
-          <Paper sx={{ 
-            p: 3, 
-            flex: 1, 
-            minWidth: '200px', 
-            borderRadius: '8px',
-            border: '1px solid #e0e0e0',
-            '&:hover': {
-              boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
-            }
-          }}>
-            <Typography variant="subtitle2" color="text.secondary">Pending</Typography>
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>
-              {leaves.filter(l => l.status === 'pending').length}
-            </Typography>
-          </Paper>
-          <Paper sx={{ 
-            p: 3, 
-            flex: 1, 
-            minWidth: '200px', 
-            borderRadius: '8px',
-            border: '1px solid #e0e0e0',
-            '&:hover': {
-              boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
-            }
-          }}>
-            <Typography variant="subtitle2" color="text.secondary">Approved</Typography>
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>
-              {leaves.filter(l => l.status === 'approved').length}
-            </Typography>
-          </Paper>
-        </Box>
+      <Row>
+        <Col md={4}>
+          <Card className="mb-4">
+            <Card.Header>
+              <h5>Leave Balance</h5>
+            </Card.Header>
+            <Card.Body>
+              {loading.balance ? (
+                <div className="text-center">
+                  <Spinner animation="border" />
+                </div>
+              ) : leaveBalance ? (
+                <>
+                  <div className="mb-3">
+                    <h6>Casual Leave</h6>
+                    <p>Total: {leaveBalance.casualLeaves?.total || 12} days</p>
+                    <p>Remaining: {leaveBalance.casualLeaves?.remaining || 12} days</p>
+                  </div>
+                  <div className="mb-3">
+                    <h6>Sick Leave</h6>
+                    <p>Total: {leaveBalance.sickLeaves?.total || 6} days</p>
+                    <p>Remaining: {leaveBalance.sickLeaves?.remaining || 6} days</p>
+                  </div>
+                  <div>
+                    <h6>Vacation Leave</h6>
+                    <p>Total: {leaveBalance.vacationLeaves?.total || 15} days</p>
+                    <p>Remaining: {leaveBalance.vacationLeaves?.remaining || 15} days</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="mb-3">
+                    <h6>Casual Leave</h6>
+                    <p>Total: 12 days</p>
+                    <p>Remaining: 12 days</p>
+                  </div>
+                  <div className="mb-3">
+                    <h6>Sick Leave</h6>
+                    <p>Total: 6 days</p>
+                    <p>Remaining: 6 days</p>
+                  </div>
+                  <div>
+                    <h6>Vacation Leave</h6>
+                    <p>Total: 15 days</p>
+                    <p>Remaining: 15 days</p>
+                  </div>
+                </>
+              )}
+            </Card.Body>
+            <Card.Footer>
+              <Button variant="primary" onClick={() => setShowRequestModal(true)}>
+                Request Leave
+              </Button>
+            </Card.Footer>
+          </Card>
+        </Col>
 
-        {/* Main Table */}
-        <Card sx={{ 
-          borderRadius: '8px', 
-          boxShadow: 'none', 
-          border: '1px solid #e0e0e0',
-          '&:hover': {
-            boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
-          }
-        }}>
-          <Box sx={{ 
-            p: 2,
-            borderBottom: '1px solid #f0f0f0'
-          }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-              Your Leave Requests
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Showing {paginatedLeaves.length} of {leaves.length} entries
-            </Typography>
-          </Box>
-          <CardContent sx={{ p: 0 }}>
-            {loading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                <CircularProgress />
-              </Box>
-            ) : (
-              <>
-                <Table>
-                  <TableHead sx={{ backgroundColor: '#fafafa' }}>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>Start Date</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>End Date</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Type</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Reason</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Supervisor Comment</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {paginatedLeaves.length > 0 ? (
-                      paginatedLeaves.map((leave) => (
-                        <TableRow 
-                          key={leave._id} 
-                          hover
-                          sx={{ 
-                            '&:hover': {
-                              backgroundColor: 'action.hover',
-                            }
-                          }}
-                        >
-                          <TableCell>
-                            {new Date(leave.startDate).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric'
-                            })}
-                          </TableCell>
-                          <TableCell>
-                            {new Date(leave.endDate).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric'
-                            })}
-                          </TableCell>
-                          <TableCell sx={{ textTransform: 'capitalize' }}>
-                            <Chip 
-                              label={leave.leaveType} 
-                              size="small" 
-                              sx={{ 
-                                backgroundColor: '#e3f2fd',
-                                color: '#1976d2',
-                                '&:hover': {
-                                  backgroundColor: '#bbdefb',
-                                }
-                              }} 
-                            />
-                          </TableCell>
-                          <TableCell>{leave.reason}</TableCell>
-                          <TableCell>
-                            <Box sx={{ 
-                              display: 'flex', 
-                              alignItems: 'center',
-                              color: 
-                                leave.status === 'approved' ? 'success.main' :
-                                leave.status === 'rejected' ? 'error.main' :
-                                'warning.main'
-                            }}>
-                              {getStatusIcon(leave.status)}
-                              <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>
-                                {leave.status}
-                              </Typography>
-                            </Box>
-                          </TableCell>
-                          <TableCell>
-                            {leave.SupervisorComment || '-'}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={6} sx={{ textAlign: 'center', py: 4 }}>
-                          <Typography variant="body2" color="text.secondary">
-                            No leave requests found
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-                {leaves.length > 5 && (
-                  <TablePagination
-                    rowsPerPageOptions={[5, 10, 25]}
-                    component="div"
-                    count={leaves.length}
-                    rowsPerPage={rowsPerPage}
-                    page={page}
-                    onPageChange={handleChangePage}
-                    onRowsPerPageChange={handleChangeRowsPerPage}
-                    sx={{
-                      borderTop: '1px solid #f0f0f0',
-                      '& .MuiTablePagination-toolbar': {
-                        padding: '0 16px'
-                      }
-                    }}
+        <Col md={8}>
+          <Card>
+            <Card.Header>
+              <h5>Leave History</h5>
+            </Card.Header>
+            <Card.Body>
+              <Tabs
+                activeKey={activeTab}
+                onSelect={(k) => setActiveTab(k)}
+                className="mb-3"
+              >
+                <Tab eventKey="all" title="All" />
+                <Tab eventKey="pending" title="Pending" />
+                <Tab eventKey="approved" title="Approved" />
+                <Tab eventKey="rejected" title="Rejected" />
+              </Tabs>
+
+              {loading.history ? (
+                <div className="text-center">
+                  <Spinner animation="border" />
+                </div>
+              ) : leaveHistory.length === 0 ? (
+                <p>No leave requests found</p>
+              ) : (
+                leaveHistory.map((leave) => (
+                  <Card key={leave._id} className={`mb-3 border-start border-5 ${leave.status}`}>
+                    <Card.Body>
+                      <div className="d-flex justify-content-between">
+                        <div>
+                          <h6>{leave.leaveType.toUpperCase()}</h6>
+                          <p className="mb-1">
+                            {format(new Date(leave.startDate), 'MMM dd, yyyy')} to {format(new Date(leave.endDate), 'MMM dd, yyyy')}
+                            {leave.isHalfDay && ' (Half Day)'}
+                          </p>
+                          <p className="mb-1"><small>Reason: {leave.reason}</small></p>
+                          {leave.reviewerComment && (
+                            <p className="mb-1"><small>Comment: {leave.reviewerComment}</small></p>
+                          )}
+                        </div>
+                        <div className="text-end">
+                          <StatusBadge status={leave.status} />
+                          {leave.status === 'pending' && (
+                            <Button
+                              variant="outline-danger"
+                              size="sm"
+                              className="mt-2"
+                              onClick={() => handleCancelRequest(leave._id)}
+                            >
+                              Cancel
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                ))
+              )}
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Leave Request Modal */}
+      <Modal show={showRequestModal} onHide={() => setShowRequestModal(false)} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>New Leave Request</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Leave Type</Form.Label>
+                  <Form.Select
+                    name="leaveType"
+                    value={formData.leaveType}
+                    onChange={handleInputChange}
+                  >
+                    <option value="casual">Casual Leave</option>
+                    <option value="sick">Sick Leave</option>
+                    <option value="vacation">Vacation Leave</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3 form-check">
+                  <Form.Check
+                    type="checkbox"
+                    label="Half Day"
+                    name="isHalfDay"
+                    checked={formData.isHalfDay}
+                    onChange={handleInputChange}
                   />
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
+                </Form.Group>
+              </Col>
+            </Row>
 
-        {/* Add Leave Modal */}
-        <Modal open={openModal} onClose={() => setOpenModal(false)}>
-          <Box sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: { xs: '90%', sm: '500px' },
-            bgcolor: 'background.paper',
-            borderRadius: '8px',
-            boxShadow: 24,
-            p: 3,
-            outline: 'none',
-            border: '1px solid #e0e0e0'
-          }}>
-            <Box sx={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              mb: 2 
-            }}>
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                New Leave Request
-              </Typography>
-              <IconButton 
-                onClick={() => setOpenModal(false)}
-                sx={{
-                  '&:hover': {
-                    backgroundColor: 'action.hover',
-                  }
-                }}
-              >
-                <Close />
-              </IconButton>
-            </Box>
-            <Divider sx={{ mb: 3 }} />
-            <form onSubmit={handleSubmit}>
-              <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Start Date"
-                  name="startDate"
-                  type="date"
-                  value={form.startDate}
-                  onChange={handleChange}
-                  required
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                />
-                <TextField
-                  fullWidth
-                  label="End Date"
-                  name="endDate"
-                  type="date"
-                  value={form.endDate}
-                  onChange={handleChange}
-                  required
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                />
-              </Box>
-              <Select
-                fullWidth
-                label="Leave Type"
-                name="leaveType"
-                value={form.leaveType}
-                onChange={handleChange}
-                sx={{ mb: 2 }}
-              >
-                <MenuItem value="casual">Casual Leave</MenuItem>
-                <MenuItem value="sick">Sick Leave</MenuItem>
-                <MenuItem value="vacation">Vacation Leave</MenuItem>
-                <MenuItem value="maternity">Maternity Leave</MenuItem>
-                <MenuItem value="paternity">Paternity Leave</MenuItem>
-                <MenuItem value="other">Other</MenuItem>
-              </Select>
-              <TextField
-                fullWidth
-                label="Reason"
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Start Date</Form.Label>
+                  <Form.Control
+                    type="date"
+                    name="startDate"
+                    value={formData.startDate}
+                    onChange={handleInputChange}
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>End Date</Form.Label>
+                  <Form.Control
+                    type="date"
+                    name="endDate"
+                    value={formData.endDate}
+                    onChange={handleInputChange}
+                    disabled={formData.isHalfDay}
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Reason</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
                 name="reason"
-                value={form.reason}
-                onChange={handleChange}
-                required
-                multiline
-                rows={4}
-                sx={{ mb: 3 }}
+                value={formData.reason}
+                onChange={handleInputChange}
               />
-              <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'flex-end', 
-                gap: 2 
-              }}>
-                <Button 
-                  variant="outlined" 
-                  onClick={() => setOpenModal(false)}
-                  sx={{ 
-                    borderRadius: '8px',
-                    '&:hover': {
-                      backgroundColor: 'action.hover',
-                    }
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  variant="contained" 
-                  type="submit"
-                  sx={{ 
-                    borderRadius: '8px',
-                    '&:hover': {
-                      backgroundColor: 'primary.dark',
-                    }
-                  }}
-                >
-                  Submit Request
-                </Button>
-              </Box>
-            </form>
-          </Box>
-        </Modal>
-      </Box>
-    </Box>
-    </DashboardLayout>
+            </Form.Group>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowRequestModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleSubmitRequest}>
+            Submit Request
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    </Container>
   );
 };
 
-export default Leave;
+export default EmployeeLeaveManagement;

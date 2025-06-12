@@ -14,7 +14,7 @@ import AppraisalForm from './pages/Employee/Appraisal';
 import ManagerProfilePage from './pages/Manager/Profile';
 import ManagerPolicyPage from './pages/Manager/Policy';
 import ExpenseTracker1 from './pages/Manager/Expense';
-import ManagerLeave from './pages/Employee/Leave';
+import ManagerLeave from './pages/Manager/Leave';
 import ManagerReviewDashboard from './pages/Manager/Review';
 import ManagerAppraisal from './pages/Manager/Appraisal';
 

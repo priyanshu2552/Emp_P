@@ -40,6 +40,7 @@ const ContentContainer = styled(Box)(({ theme }) => ({
 
 const AdminUsers = () => {
   const [users, setUsers] = useState([]);
+  const [managers, setManagers] = useState([]);
   const [roleFilter, setRoleFilter] = useState('');
   const [loading, setLoading] = useState(false);
   const [openModal, setOpenModal] = useState(false);
@@ -71,11 +72,20 @@ const AdminUsers = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
+
+      // Fetch all users (or filtered by role)
       const res = await axios.get(
         `http://localhost:5000/api/admin/users${roleFilter ? `?role=${roleFilter}` : ''}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setUsers(res.data);
+
+      // Fetch just managers and admins for the dropdown
+      const managersRes = await axios.get(
+        'http://localhost:5000/api/admin/users?role=manager,admin',
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setManagers(managersRes.data);
     } catch (err) {
       console.error('Failed to fetch users', err);
     } finally {
@@ -85,7 +95,7 @@ const AdminUsers = () => {
 
   const handleAddUser = async () => {
     if (!validate()) return;
-    
+
     try {
       const token = localStorage.getItem('token');
       await axios.post('http://localhost:5000/api/admin/users', newUser, {
@@ -111,7 +121,7 @@ const AdminUsers = () => {
     } catch (err) {
       console.error('Failed to add user', err);
       if (err.response?.data?.message) {
-        setErrors({...errors, form: err.response.data.message});
+        setErrors({ ...errors, form: err.response.data.message });
       }
     }
   };
@@ -161,17 +171,23 @@ const AdminUsers = () => {
       </Box>
 
       <Box mb={4}>
-        <FormControl fullWidth variant="outlined" size="small" sx={{ maxWidth: 300 }}>
-          <InputLabel>Filter by Role</InputLabel>
+        <FormControl fullWidth size="small">
+          <InputLabel>Manager</InputLabel>
           <Select
-            label="Filter by Role"
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
+            value={newUser.manager || ''}
+            onChange={(e) => setNewUser({
+              ...newUser,
+              manager: e.target.value === '' ? null : e.target.value
+            })}
+            displayEmpty
+            label="Manager"
           >
-            <MenuItem value="">All Users</MenuItem>
-            <MenuItem value="admin">Admin</MenuItem>
-            <MenuItem value="manager">Manager</MenuItem>
-            <MenuItem value="employee">Employee</MenuItem>
+            <MenuItem value="">No Manager</MenuItem>
+            {managers.map((manager) => (
+              <MenuItem key={manager._id} value={manager._id}>
+                {manager.name} ({manager.role})
+              </MenuItem>
+            ))}
           </Select>
         </FormControl>
       </Box>
