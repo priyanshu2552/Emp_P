@@ -5,7 +5,7 @@ import {
   TableHead, TableRow, Alert, CircularProgress,
   TextField, MenuItem, Dialog, DialogTitle,
   DialogContent, DialogActions, FormControl,Rating,
-  InputLabel, Select
+  InputLabel, Select, List, ListItem, ListItemText
 } from '@mui/material';
 import axios from 'axios';
 
@@ -15,6 +15,8 @@ const AdminDashboard = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
+  const [openDetailsDialog, setOpenDetailsDialog] = useState(false);
+  const [selectedAppraisal, setSelectedAppraisal] = useState(null);
   const [filter, setFilter] = useState({
     status: '',
     period: '',
@@ -77,6 +79,11 @@ const AdminDashboard = () => {
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create template');
     }
+  };
+
+  const handleViewDetails = (appraisal) => {
+    setSelectedAppraisal(appraisal);
+    setOpenDetailsDialog(true);
   };
 
   if (loading) return <CircularProgress />;
@@ -150,6 +157,7 @@ const AdminDashboard = () => {
               <TableCell>Period</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Overall Rating</TableCell>
+              <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -168,11 +176,20 @@ const AdminDashboard = () => {
                       </Box>
                     ) : 'N/A'}
                   </TableCell>
+                  <TableCell>
+                    <Button 
+                      variant="outlined" 
+                      size="small"
+                      onClick={() => handleViewDetails(appraisal)}
+                    >
+                      View Details
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} align="center">
+                <TableCell colSpan={6} align="center">
                   No appraisals found
                 </TableCell>
               </TableRow>
@@ -181,6 +198,143 @@ const AdminDashboard = () => {
         </Table>
       </TableContainer>
       
+      {/* Appraisal Details Dialog */}
+      <Dialog 
+        open={openDetailsDialog} 
+        onClose={() => setOpenDetailsDialog(false)}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogTitle>
+          Appraisal Details - {selectedAppraisal?.employee?.name || 'Employee'}
+        </DialogTitle>
+        <DialogContent>
+          {selectedAppraisal && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                General Information
+              </Typography>
+              <List>
+                <ListItem>
+                  <ListItemText 
+                    primary="Period" 
+                    secondary={`${selectedAppraisal.period} ${selectedAppraisal.year}`} 
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemText 
+                    primary="Status" 
+                    secondary={selectedAppraisal.status} 
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemText 
+                    primary="Overall Rating" 
+                    secondary={
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Rating value={selectedAppraisal.overallRating} precision={0.5} readOnly />
+                        <Typography sx={{ ml: 1 }}>{selectedAppraisal.overallRating}</Typography>
+                      </Box>
+                    } 
+                  />
+                </ListItem>
+              </List>
+
+              {selectedAppraisal.kras && selectedAppraisal.kras.length > 0 && (
+                <>
+                  <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+                    Key Result Areas
+                  </Typography>
+                  {selectedAppraisal.kras.map((kra, index) => (
+                    <Paper key={index} sx={{ p: 2, mb: 2 }}>
+                      <Typography variant="subtitle1" gutterBottom>
+                        {kra.name}
+                      </Typography>
+                      {kra.managerRating && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                          <Typography variant="body2" sx={{ mr: 1 }}>
+                            Manager Rating:
+                          </Typography>
+                          <Rating value={kra.managerRating} precision={0.5} readOnly />
+                        </Box>
+                      )}
+                      {kra.achievements && (
+                        <Typography variant="body2" gutterBottom>
+                          <strong>Achievements:</strong> {kra.achievements}
+                        </Typography>
+                      )}
+                      {kra.areasToImprove && (
+                        <Typography variant="body2" gutterBottom>
+                          <strong>Areas to Improve:</strong> {kra.areasToImprove}
+                        </Typography>
+                      )}
+
+                      {kra.kpis && kra.kpis.length > 0 && (
+                        <Box sx={{ mt: 2 }}>
+                          <Typography variant="subtitle2" gutterBottom>
+                            KPIs
+                          </Typography>
+                          <TableContainer component={Paper} sx={{ mb: 2 }}>
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell>KPI</TableCell>
+                                  <TableCell>Target</TableCell>
+                                  <TableCell>Manager Rating</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {kra.kpis.map((kpi, kpiIndex) => (
+                                  <TableRow key={kpiIndex}>
+                                    <TableCell>{kpi.name}</TableCell>
+                                    <TableCell>{kpi.target}</TableCell>
+                                    <TableCell>
+                                      {kpi.managerRating ? (
+                                        <Rating value={kpi.managerRating} precision={0.5} readOnly />
+                                      ) : 'N/A'}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                        </Box>
+                      )}
+                    </Paper>
+                  ))}
+                </>
+              )}
+
+              {selectedAppraisal.managerFeedback && (
+                <>
+                  <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+                    Manager Feedback
+                  </Typography>
+                  <Paper sx={{ p: 2, mb: 2 }}>
+                    <Typography>{selectedAppraisal.managerFeedback}</Typography>
+                  </Paper>
+                </>
+              )}
+
+              {selectedAppraisal.actionPlan && (
+                <>
+                  <Typography variant="h6" gutterBottom>
+                    Action Plan
+                  </Typography>
+                  <Paper sx={{ p: 2 }}>
+                    <Typography>{selectedAppraisal.actionPlan}</Typography>
+                  </Paper>
+                </>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDetailsDialog(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Create Appraisal Dialog (existing code remains the same) */}
       <Dialog 
         open={openDialog} 
         onClose={() => setOpenDialog(false)}

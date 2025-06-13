@@ -41,10 +41,10 @@ const appraisalSchema = new mongoose.Schema({
     default: new Date().getFullYear()
   },
   
-  // Section A: Performance Review
+  // Performance Review
   kras: [kraSchema],
   
-  // Section B: General Review
+  // General Review
   additionalComments: String,
   careerGoals: String,
   
@@ -72,10 +72,21 @@ const appraisalSchema = new mongoose.Schema({
   updatedAt: Date
 });
 
+// Helper method to get current period
+appraisalSchema.statics.getCurrentPeriod = function() {
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
+  
+  if (month >= 1 && month <= 3) return { period: 'Q1', year };
+  if (month >= 4 && month <= 6) return { period: 'Q2', year };
+  if (month >= 7 && month <= 9) return { period: 'Q3', year };
+  if (month >= 10 && month <= 12) return { period: 'Q4', year };
+};
+
 appraisalSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   
-  // Update timestamps based on status changes
   if (this.isModified('status')) {
     if (this.status === 'submitted') {
       this.submittedAt = new Date();

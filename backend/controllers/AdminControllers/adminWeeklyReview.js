@@ -1,34 +1,47 @@
 const WeeklyReview = require('../../models/WeeklyReview');
 const User = require('../../models/User');
+const asyncHandler = require('express-async-handler');
 
-// GET all weekly reviews with optional managerId filter and date sort
-exports.getAllWeeklyReviews = async (req, res) => {
-  try {
-    const { managerId, sort } = req.query;
-    const query = managerId ? { managerId } : {};
+// @desc    Get all weekly reviews
+// @route   GET /api/admin/reviews
+// @access  Private/Admin
+const getAllReviews = asyncHandler(async (req, res) => {
+  const reviews = await WeeklyReview.find()
+    .populate('employee', 'name email EmployeeId Department')
+    .populate('manager', 'name email');
+  
+  res.json(reviews);
+});
 
-    const reviews = await WeeklyReview.find(query)
-      .populate('employeeId', 'name email role')
-      .populate('managerId', 'name email role')
-      .sort({ weekStartDate: sort === 'asc' ? 1 : -1 });
+// @desc    Get all users
+// @route   GET /api/admin/users
+// @access  Private/Admin
+const getAllUsers = asyncHandler(async (req, res) => {
+  const users = await User.find({}, '-password');
+  res.json(users);
+});
 
-    res.status(200).json({ success: true, data: reviews });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Server Error' });
-  }
-};
+// @desc    Get overview statistics
+// @route   GET /api/admin/overview
+// @access  Private/Admin
+const getOverview = asyncHandler(async (req, res) => {
+  const totalEmployees = await User.countDocuments({ role: 'employee' });
+  const totalManagers = await User.countDocuments({ role: 'manager' });
+  const pendingReviews = await WeeklyReview.countDocuments({ status: 'pending' });
+  const submittedReviews = await WeeklyReview.countDocuments({ status: 'submitted' });
+  const reviewedReviews = await WeeklyReview.countDocuments({ status: 'reviewed' });
 
-// GET user details by ID
-exports.getUserDetails = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id).select('-password');
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-    res.status(200).json({ success: true, data: user });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Server Error' });
-  }
+  res.json({
+    totalEmployees,
+    totalManagers,
+    pendingReviews,
+    submittedReviews,
+    reviewedReviews
+  });
+});
+
+module.exports = {
+  getAllReviews,
+  getAllUsers,
+  getOverview
 };

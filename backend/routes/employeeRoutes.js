@@ -11,7 +11,8 @@ const policyController = require('../controllers/EmployeeControllers/employeePol
 const {
   getCurrentAppraisal,
   updateSelfEvaluation,
-  submitAppraisal
+  submitAppraisal,
+  getEmployeeAppraisals
 } = require('../controllers/EmployeeControllers/appraisalController');
 const multer = require('multer');
 
@@ -84,7 +85,9 @@ router.post('/leave/request', authMiddleware.protect, employeeLeaveController.cr
 router.put('/leave/request/:id/cancel', authMiddleware.protect, employeeLeaveController.cancelLeaveRequest);
 
 // ---------Review-----
-router.get('/reviews', authMiddleware.protect, employeeReview.getEmployeeReviews);
+router.route('/reviews')
+  .get(authMiddleware.protect, employeeReview.getMyReviews)
+  .post(authMiddleware.protect, employeeReview.submitReview);
 
 //---------Policies------
 router.get('/policies', authMiddleware.protect, policyController.getAllPolicies);
@@ -94,9 +97,8 @@ router.get('/policies/:id/text', authMiddleware.protect, policyController.getPol
 
 console.log('Employee routes loaded');
 //---------Appraisals---------
-router.get('/appraisal',authMiddleware.protect, authMiddleware.authorize('employee'), getCurrentAppraisal);
-router.put('/appraisal',authMiddleware.protect, authMiddleware.authorize('employee'), updateSelfEvaluation);
-router.post('/appraisal/submit',authMiddleware.protect, authMiddleware.authorize('employee'), submitAppraisal);
-
-
+router.get('/appraisals', authMiddleware.protect, authMiddleware.authorize('employee'), getEmployeeAppraisals);
+router.get('/appraisal', authMiddleware.protect, authMiddleware.authorize('employee'), getCurrentAppraisal);
+router.put('/appraisal', authMiddleware.protect, authMiddleware.authorize('employee'), updateSelfEvaluation);
+router.post('/appraisal/submit', authMiddleware.protect, authMiddleware.authorize('employee'), submitAppraisal);
 module.exports = router;

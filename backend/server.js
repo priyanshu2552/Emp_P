@@ -8,7 +8,8 @@ const cors = require('cors');
 const employeeRoutes = require('./routes/employeeRoutes');
 const managerRoutes = require('./routes/managerRoutes');
 const adminRoutes = require('./routes/adminRoutes');
-
+const session = require('express-session');
+const flash = require('connect-flash');
 connectDB();
 // crn setup
 cron.schedule('0 0 1 1 *', () => {
@@ -25,8 +26,21 @@ app.use(cors({
   origin: 'http://localhost:3000',
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json()); // For parsing application/json
+app.use(express.urlencoded({ extended: true })); // For parsing form data
+app.use(session({
+  secret: 'your-secret-key',
+  resave: false,
+  saveUninitialized: false
+}));
+app.use(flash());
 
+// Make flash messages available to templates (if using server-side rendering)
+app.use((req, res, next) => {
+  res.locals.success_msg = req.flash('success');
+  res.locals.error_msg = req.flash('error');
+  next();
+});
 // Serve static files for uploaded PDFs
 app.use('/uploads', express.static('uploads'));
 

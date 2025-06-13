@@ -1,61 +1,57 @@
 const WeeklyReview = require('../../models/WeeklyReview');
 const User = require('../../models/User');
+const asyncHandler = require('express-async-handler');
 
-// Get employees of a manager
-exports.getEmployeesForManager = async (req, res) => {
-  try {
-    const managerId = req.user.id;
-    const employees = await User.find({ manager: managerId }).select('-password');
-    res.json({ success: true, employees });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Failed to fetch employees' });
+// @desc    Get reviews assigned to manager
+// @route   GET /api/manager/reviews
+// @access  Private/Manager
+const getAssignedReviews = asyncHandler(async (req, res) => {
+  const reviews = await WeeklyReview.find({ manager: req.user._id, status: 'submitted' })
+    .populate('employee', 'name email EmployeeId Department');
+  
+  res.json(reviews);
+});
+
+// @desc    Submit manager review
+// @route   PUT /api/manager/reviews/:id
+// @access  Private/Manager
+const submitManagerReview = asyncHandler(async (req, res) => {
+  const { feedback, rating, nextWeekPlan } = req.body;
+
+  const review = await WeeklyReview.findById(req.params.id);
+
+  if (!review) {
+    res.status(404);
+    throw new Error('Review not found');
   }
-};
 
-exports.getEmployeeDetailsById = async (req, res) => {
-  try {
-    const employee = await User.findById(req.params.id).select('-password');
-    if (!employee) {
-      return res.status(404).json({ success: false, message: 'Employee not found' });
-    }
-    res.json({ success: true, employee });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Failed to fetch employee details' });
+  if (review.manager.toString() !== req.user._id.toString()) {
+    res.status(401);
+    throw new Error('Not authorized to review this');
   }
-};
-// Submit a weekly review
-exports.submitReview = async (req, res) => {
-  try {
-    const { employeeId, weekStartDate, weekEndDate, accomplishments, feedback, rating } = req.body;
 
-    const review = new WeeklyReview({
-      employeeId,
-      managerId: req.user.id,
-      weekStartDate,
-      weekEndDate,
-      accomplishments,
-      feedback,
-      rating,
-    });
+  review.managerReview = {
+    feedback,
+    rating,
+    nextWeekPlan,
+    reviewedAt: Date.now()
+  };
+  review.status = 'reviewed';
 
-    await review.save();
-    res.json({ success: true, message: 'Review submitted', review });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Failed to submit review' });
-  }
-};
+  const updatedReview = await review.save();
+  res.json(updatedReview);
+});
 
-// Get previous reviews written by the manager
-exports.getManagerReviews = async (req, res) => {
-  try {
-    const reviews = await WeeklyReview.find({ managerId: req.user.id })
-      .populate('employeeId', 'name email')
-      .sort({ createdAt: -1 });
+// @desc    Get manager's team members
+// @route   GET /api/manager/team
+// @access  Private/Manager
+const getTeamMembers = asyncHandler(async (req, res) => {
+  const team = await User.find({ manager: req.user._id }, 'name email EmployeeId Department');
+  res.json(team);
+});
 
-    res.json({ success: true, reviews });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Failed to fetch reviews' });
-  }
+module.exports = {
+  getAssignedReviews,
+  submitManagerReview,
+  getTeamMembers
 };

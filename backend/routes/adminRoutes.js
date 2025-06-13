@@ -10,8 +10,8 @@ const { GridFsStorage } = require('multer-gridfs-storage');
 // Controllers
 const {
   getAllAppraisals,
-  getAppraisalsByEmployee,
-  createAppraisalTemplate
+  createAppraisalCycle,
+  getAppraisalStats
 } = require('../controllers/AdminControllers/adminAppraisal');
 const { getAdminDashboardData } = require('../controllers/AdminControllers/adminDashboard');
 const { getUsers, addUser, deleteUser } = require('../controllers/AdminControllers/adminManageUser');
@@ -25,7 +25,11 @@ const {
 } = require('../controllers/AdminControllers/adminLeave');
 
 const { addPolicy, getAllPolicies, updatePolicy, deletePolicy, getPolicyFile } = require('../controllers/AdminControllers/adminPolicies');
-const weeklyReviewController = require('../controllers/AdminControllers/adminWeeklyReview');
+const {
+  getAllReviews,
+  getAllUsers,
+  getOverview
+} = require('../controllers/AdminControllers/adminWeeklyReview');
 const { MongoClient, ObjectId } = require('mongodb');
 const { GridFSBucket } = require('mongodb');
 const Policy = require('../models/Policy');
@@ -324,14 +328,15 @@ router.post('/reset-allocations', resetYearlyAllocations);
 // ==============================
 router.route('/appraisals')
   .get(protect, authorize('admin'), getAllAppraisals)
-  .post(protect, authorize('admin'), createAppraisalTemplate);
+  .post(protect, authorize('admin'), createAppraisalCycle);
 
-router.route('/appraisals/employee/:employeeId')
-  .get(protect, authorize('admin'), getAppraisalsByEmployee);
+router.get('/appraisals/stats', protect, authorize('admin'), getAppraisalStats);
 // ==============================
 // Weekly Review Management
-// ==============================
-router.get('/weekly-reviews', weeklyReviewController.getAllWeeklyReviews);
-router.get('/weekly-reviews/user/:id', weeklyReviewController.getUserDetails);
+router.route('/reviews').get(protect, getAllReviews);
+router.route('/users').get(protect,  getAllUsers);
+router.route('/overview').get(protect,  getOverview);
+
+
 
 module.exports = router;
