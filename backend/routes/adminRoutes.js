@@ -1,5 +1,5 @@
 const express = require('express');
-const pdf = require('pdf-parse'); 
+const pdf = require('pdf-parse');
 const router = express.Router();
 const path = require('path');
 const multer = require('multer');
@@ -8,7 +8,11 @@ const { protect, authorize } = require('../middlewares/authMiddleware');
 const { GridFsStorage } = require('multer-gridfs-storage');
 
 // Controllers
-const adminAppraisalController = require('../controllers/AdminControllers/adminAppraisal');
+const {
+  getAllAppraisals,
+  getAppraisalsByEmployee,
+  createAppraisalTemplate
+} = require('../controllers/AdminControllers/adminAppraisal');
 const { getAdminDashboardData } = require('../controllers/AdminControllers/adminDashboard');
 const { getUsers, addUser, deleteUser } = require('../controllers/AdminControllers/adminManageUser');
 const expenseController = require('../controllers/AdminControllers/adminExpense');
@@ -24,7 +28,7 @@ const { addPolicy, getAllPolicies, updatePolicy, deletePolicy, getPolicyFile } =
 const weeklyReviewController = require('../controllers/AdminControllers/adminWeeklyReview');
 const { MongoClient, ObjectId } = require('mongodb');
 const { GridFSBucket } = require('mongodb');
-const Policy = require('../models/Policy'); 
+const Policy = require('../models/Policy');
 
 const client = new MongoClient(process.env.MONGO_URI);
 let db, bucket;
@@ -58,7 +62,7 @@ async function handleFileUpload(file) {
     const uploadStream = bucket.openUploadStream(filename, {
       contentType: file.mimetype
     });
-    
+
     uploadStream.on('finish', () => resolve(uploadStream.id));
     uploadStream.on('error', reject);
     uploadStream.end(file.buffer);
@@ -70,7 +74,7 @@ async function handleFileDownload(fileId, res) {
   try {
     const _id = new ObjectId(fileId);
     const files = await bucket.find({ _id }).toArray();
-    
+
     if (!files.length) {
       return res.status(404).json({ success: false, message: 'File not found' });
     }
@@ -87,7 +91,7 @@ async function handleFileDownload(fileId, res) {
 async function handleFileDelete(fileId) {
   const db = await connectToMongo();
   const bucket = new GridFSBucket(db, { bucketName: 'policies' });
-  
+
   return new Promise((resolve, reject) => {
     // First check if file exists
     bucket.find({ _id: new ObjectId(fileId) }).toArray((err, files) => {
@@ -96,7 +100,7 @@ async function handleFileDelete(fileId) {
         console.warn(`File ${fileId} not found in GridFS - skipping deletion`);
         return resolve(); // Resolve instead of reject for missing files
       }
-      
+
       // If file exists, delete it
       bucket.delete(new ObjectId(fileId), (err) => {
         if (err) return reject(err);
@@ -121,8 +125,8 @@ router.get('/policies', async (req, res) => {
     res.json({ success: true, policies });
   } catch (err) {
     console.error('Error fetching policies:', err);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Server error',
       error: err.message
     });
@@ -136,7 +140,7 @@ router.post('/policies', upload.single('pdf'), async (req, res) => {
     }
 
     const fileId = await handleFileUpload(req.file);
-    
+
     let extractedText = '';
     try {
       const data = await pdf(req.file.buffer);
@@ -160,10 +164,10 @@ router.post('/policies', upload.single('pdf'), async (req, res) => {
     res.status(201).json({ success: true, policy: newPolicy });
   } catch (err) {
     console.error('Error uploading policy:', err);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Error uploading policy',
-      error: err.message 
+      error: err.message
     });
   }
 });
@@ -201,17 +205,17 @@ router.put('/policies/:id', upload.single('pdf'), async (req, res) => {
 router.delete('/policies/:id', protect, authorize('admin'), async (req, res) => {
   try {
     if (!ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid policy ID format' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid policy ID format'
       });
     }
 
     const policy = await Policy.findById(req.params.id);
     if (!policy) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Policy not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Policy not found'
       });
     }
 
@@ -224,17 +228,17 @@ router.delete('/policies/:id', protect, authorize('admin'), async (req, res) => 
     }
 
     await Policy.findByIdAndDelete(req.params.id);
-    
-    res.json({ 
-      success: true, 
-      message: 'Policy deleted successfully' 
+
+    res.json({
+      success: true,
+      message: 'Policy deleted successfully'
     });
   } catch (err) {
     console.error('Delete policy error:', err);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Error deleting policy',
-      error: err.message 
+      error: err.message
     });
   }
 });
@@ -243,47 +247,47 @@ router.get('/policies/:id/download', protect, authorize('admin'), async (req, re
   try {
     const policy = await Policy.findById(req.params.id);
     if (!policy) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Policy not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Policy not found'
       });
     }
 
     if (!policy.fileId) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'No file associated with this policy' 
+      return res.status(404).json({
+        success: false,
+        message: 'No file associated with this policy'
       });
     }
 
     const bucket = new GridFSBucket(db, { bucketName: 'policies' });
-    
+
     const files = await bucket.find({ _id: new ObjectId(policy.fileId) }).toArray();
     if (!files.length) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'File not found in database' 
+      return res.status(404).json({
+        success: false,
+        message: 'File not found in database'
       });
     }
 
     res.set('Content-Type', files[0].contentType || 'application/pdf');
     res.set('Content-Disposition', `attachment; filename="${policy.title}.pdf"`);
-    
+
     const downloadStream = bucket.openDownloadStream(new ObjectId(policy.fileId));
     downloadStream.on('error', () => {
-      res.status(500).json({ 
-        success: false, 
-        message: 'Error streaming file' 
+      res.status(500).json({
+        success: false,
+        message: 'Error streaming file'
       });
     });
     downloadStream.pipe(res);
-    
+
   } catch (err) {
     console.error('Download error:', err);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Error downloading file',
-      error: err.message 
+      error: err.message
     });
   }
 });
@@ -318,9 +322,12 @@ router.post('/reset-allocations', resetYearlyAllocations);
 // ==============================
 // Appraisal Management
 // ==============================
-router.get('/appraisals', adminAppraisalController.getAllAppraisals);
-router.get('/user/:id', adminAppraisalController.getUserDetails);
+router.route('/appraisals')
+  .get(protect, authorize('admin'), getAllAppraisals)
+  .post(protect, authorize('admin'), createAppraisalTemplate);
 
+router.route('/appraisals/employee/:employeeId')
+  .get(protect, authorize('admin'), getAppraisalsByEmployee);
 // ==============================
 // Weekly Review Management
 // ==============================

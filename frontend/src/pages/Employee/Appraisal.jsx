@@ -1,707 +1,391 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  Box,
-  Typography,
-  Button,
-  Card,
-  CardContent,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  TextField,
-  Modal,
-  Divider,
-  IconButton,
-  Paper,
-  Chip,
-  CircularProgress,
-  TablePagination,
-  TextareaAutosize,
-  Select,
-  MenuItem
+  Container, Typography, Box, Button, Paper,
+  TextField, Rating, Alert, CircularProgress, Card, CardContent
 } from '@mui/material';
-import { Add, Close, Refresh } from '@mui/icons-material';
-import DashboardLayout from '../../components/Layout/EmployeeLayout';
 import axios from 'axios';
+import { Formik, Form, FieldArray } from 'formik';
+import * as Yup from 'yup';
 
-const AppraisalFormAndList = () => {
-  const [formData, setFormData] = useState({
-    period: '',
-    projectName: '',
-    workSummary: '',
-    technologiesUsed: '',
-    achievements: '',
-    selfRating: '',
-    additionalComments: '',
-    attachments: '',
-  });
-
-  const [appraisals, setAppraisals] = useState([]);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+const EmployeeDashboard = () => {
+  const [appraisal, setAppraisal] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [openModal, setOpenModal] = useState(false);
-  const [selectedAppraisal, setSelectedAppraisal] = useState(null);
-  const [openDetailsModal, setOpenDetailsModal] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const navigate = useNavigate();
 
-  // Pagination state
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
-
-  // Fetch earlier appraisals on component mount
   useEffect(() => {
-    const fetchAppraisals = async () => {
+    const fetchAppraisal = async () => {
       try {
-        setLoading(true);
-        const token = localStorage.getItem('token');
-        const response = await axios.get(
-          'http://localhost:5000/api/employees/appraisal',
-          {
-            headers: { Authorization: `Bearer ${token}` }
-          }
-        );
-        setAppraisals(response.data);
+        const { data } = await axios.get('http://localhost:5000/api/employees/appraisal', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        setAppraisal(data);
       } catch (err) {
-        setError('Failed to fetch appraisals');
+        setError(err.response?.data?.message || 'Failed to fetch appraisal');
       } finally {
         setLoading(false);
       }
     };
-    fetchAppraisals();
+    fetchAppraisal();
   }, []);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const initialValues = appraisal || {
+    kras: [
+      {
+        name: 'Code Quality',
+        selfRating: null,
+        achievements: '',
+        areasToImprove: '',
+        kpis: [
+          { name: 'Code review pass rate', target: '90%+', selfRating: null },
+          { name: 'Defect leakage', target: '<5%', selfRating: null },
+          { name: 'Coding standards', target: '100% adherence', selfRating: null }
+        ]
+      },
+      {
+        name: 'On-Time Delivery',
+        selfRating: null,
+        achievements: '',
+        areasToImprove: '',
+        kpis: [
+          { name: 'Sprint completion', target: '95%', selfRating: null },
+          { name: 'Scope creep', target: '<10%', selfRating: null }
+        ]
+      }
+    ],
+    additionalComments: '',
+    careerGoals: ''
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setMessage('');
-    setError('');
+  const validationSchema = Yup.object().shape({
+    kras: Yup.array().of(
+      Yup.object().shape({
+        selfRating: Yup.number().min(1, 'Rating must be at least 1').max(5, 'Rating must be at most 5'),
+        achievements: Yup.string().required('Achievements are required'),
+        areasToImprove: Yup.string().required('Areas to improve are required')
+      })
+    ),
+    additionalComments: Yup.string(),
+    careerGoals: Yup.string()
+  });
 
-    const dataToSend = {
-      ...formData,
-      technologiesUsed: formData.technologiesUsed.split(',').map(s => s.trim()),
-      achievements: formData.achievements.split(',').map(s => s.trim()),
-      attachments: formData.attachments ? formData.attachments.split(',').map(s => s.trim()) : [],
-      selfRating: {
-        technicalSkills: Number(formData.selfRating) || 3,
-        communication: Number(formData.selfRating) || 3,
-        teamwork: Number(formData.selfRating) || 3,
-      }
-    };
-
+  const handleSubmit = async (values, { setSubmitting }) => {
     try {
-      const token = localStorage.getItem('token');
+      const url = appraisal
+        ? 'http://localhost:5000/api/employees/appraisal'
+        : 'http://localhost:5000/api/employees/appraisal';
 
+      const method = appraisal ? 'put' : 'post';
+
+      const { data } = await axios[method](url, values, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+
+      setAppraisal(data);
+      setSuccess('Appraisal saved successfully');
+      setError('');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save appraisal');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSubmitAppraisal = async (values, { setSubmitting }) => {
+    try {
       const response = await axios.post(
-        'http://localhost:5000/api/employees/appraisal',
-        dataToSend,
+        'http://localhost:5000/api/employees/appraisal/submit',
+        {
+          kras: values.kras.map(kra => ({
+            name: kra.name,
+            selfRating: kra.selfRating,
+            achievements: kra.achievements,
+            areasToImprove: kra.areasToImprove,
+            kpis: kra.kpis.map(kpi => ({
+              name: kpi.name,
+              target: kpi.target,
+              selfRating: kpi.selfRating
+            }))
+          })),
+          additionalComments: values.additionalComments,
+          careerGoals: values.careerGoals,
+          period: appraisal?.period || 'Q1',
+          year: appraisal?.year || new Date().getFullYear()
+        },
         {
           headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
           }
         }
       );
 
-      setMessage('Appraisal created successfully!');
-      setAppraisals(prev => [response.data, ...prev]);
-      setFormData({
-        period: '',
-        projectName: '',
-        workSummary: '',
-        technologiesUsed: '',
-        achievements: '',
-        selfRating: '',
-        additionalComments: '',
-        attachments: '',
-      });
-      setOpenModal(false);
+      setSuccess('Appraisal submitted successfully');
+      setError('');
+      navigate('/employee');
     } catch (err) {
-      setError(err.response?.data?.message || 'Error creating appraisal');
-    }
-  };
-
-  const handleViewDetails = (appraisal) => {
-    setSelectedAppraisal(appraisal);
-    setOpenDetailsModal(true);
-  };
-
-  // Handle pagination
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  // Calculate paginated appraisals
-  const paginatedAppraisals = appraisals.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'approved': return 'success';
-      case 'rejected': return 'error';
-      case 'pending': return 'warning';
-      default: return 'info';
-    }
-  };
-
-  const refreshAppraisals = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get(
-        'http://localhost:5000/api/employees/appraisal',
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-      setAppraisals(response.data);
-    } catch (err) {
-      setError('Failed to fetch appraisals');
+      console.error('Submission error:', err);
+      setError(err.response?.data?.message || 'Failed to submit appraisal');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  return (
-    <DashboardLayout>
-      <Box sx={{ 
-        display: 'flex',
-        flexDirection: 'column',
-        p: 2,
-        minHeight: 'calc(100vh - 64px)',
-        overflow: 'hidden'
-      }}>
-        <Box sx={{ 
-          width: '100%',
-          maxWidth: '1200px',
-          mx: 'auto'
-        }}>
-          {/* Header Section */}
-          <Box sx={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            mb: 3,
-            flexWrap: 'wrap',
-            gap: 2
-          }}>
-            <Typography variant="h6" sx={{ 
-              fontWeight: 600,
-              fontSize: '1.1rem'
-            }}>
-              Performance Appraisals
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <Button
-                variant="outlined"
-                startIcon={<Refresh />}
-                onClick={refreshAppraisals}
-                sx={{ 
-                  textTransform: 'none',
-                  '&:hover': {
-                    backgroundColor: 'action.hover',
-                  }
-                }}
-              >
-                Refresh
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<Add />}
-                onClick={() => setOpenModal(true)}
-                sx={{ 
-                  textTransform: 'none',
-                  '&:hover': {
-                    backgroundColor: 'primary.dark',
-                  }
-                }}
-              >
-                New Appraisal
-              </Button>
-            </Box>
-          </Box>
+  if (loading) return <CircularProgress />;
 
-          {/* Summary Cards */}
-          <Box sx={{ 
-            display: 'flex', 
-            gap: 3, 
-            mb: 4, 
-            flexWrap: 'wrap',
-            justifyContent: 'space-between'
-          }}>
-            <Paper sx={{ 
-              p: 3, 
-              flex: 1, 
-              minWidth: '200px', 
-              borderRadius: '8px',
-              border: '1px solid #e0e0e0',
-              '&:hover': {
-                boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
-              }
-            }}>
-              <Typography variant="subtitle2" color="text.secondary">Total Appraisals</Typography>
-              <Typography variant="h4" sx={{ fontWeight: 700 }}>{appraisals.length}</Typography>
-            </Paper>
-            <Paper sx={{ 
-              p: 3, 
-              flex: 1, 
-              minWidth: '200px', 
-              borderRadius: '8px',
-              border: '1px solid #e0e0e0',
-              '&:hover': {
-                boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
-              }
-            }}>
-              <Typography variant="subtitle2" color="text.secondary">Pending</Typography>
-              <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                {appraisals.filter(a => a.status === 'pending').length}
-              </Typography>
-            </Paper>
-            <Paper sx={{ 
-              p: 3, 
-              flex: 1, 
-              minWidth: '200px', 
-              borderRadius: '8px',
-              border: '1px solid #e0e0e0',
-              '&:hover': {
-                boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
-              }
-            }}>
-              <Typography variant="subtitle2" color="text.secondary">Approved</Typography>
-              <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                {appraisals.filter(a => a.status === 'approved').length}
-              </Typography>
-            </Paper>
-          </Box>
+  if (appraisal?.status === 'submitted' || appraisal?.status === 'reviewed') {
+    return (
+      <Container maxWidth="md" sx={{ mt: 4 }}>
+        <Typography variant="h4" gutterBottom>
+          My Appraisal - {appraisal.period} {appraisal.year}
+        </Typography>
 
-          {/* Main Table */}
-          <Card sx={{ 
-            borderRadius: '8px', 
-            boxShadow: 'none', 
-            border: '1px solid #e0e0e0',
-            '&:hover': {
-              boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
-            }
-          }}>
-            <Box sx={{ 
-              p: 2,
-              borderBottom: '1px solid #f0f0f0'
-            }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                Your Appraisal History
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Showing {paginatedAppraisals.length} of {appraisals.length} entries
-              </Typography>
-            </Box>
-            <CardContent sx={{ p: 0 }}>
-              {loading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                  <CircularProgress />
-                </Box>
-              ) : (
-                <>
-                  <Table>
-                    <TableHead sx={{ backgroundColor: '#fafafa' }}>
-                      <TableRow>
-                        <TableCell sx={{ fontWeight: 600 }}>Period</TableCell>
-                        <TableCell sx={{ fontWeight: 600 }}>Project</TableCell>
-                        <TableCell sx={{ fontWeight: 600 }}>Self Rating</TableCell>
-                        <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                        <TableCell sx={{ fontWeight: 600 }}>Submitted</TableCell>
-                        <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {paginatedAppraisals.length > 0 ? (
-                        paginatedAppraisals.map((appraisal) => (
-                          <TableRow 
-                            key={appraisal._id} 
-                            hover
-                            sx={{ 
-                              '&:hover': {
-                                backgroundColor: 'action.hover',
-                              }
-                            }}
-                          >
-                            <TableCell>
-                              {appraisal.period}
-                            </TableCell>
-                            <TableCell>
-                              {appraisal.projectName || '-'}
-                            </TableCell>
-                            <TableCell>
-                              {appraisal.selfRating ? 
-                                (appraisal.selfRating.technicalSkills + appraisal.selfRating.communication + appraisal.selfRating.teamwork) / 3 
-                                : '-'}
-                            </TableCell>
-                            <TableCell>
-                              <Chip 
-                                label={appraisal.status} 
-                                color={getStatusColor(appraisal.status)}
-                                size="small"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {new Date(appraisal.submittedAt).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
-                            </TableCell>
-                            <TableCell>
-                              <Button 
-                                variant="outlined" 
-                                size="small"
-                                onClick={() => handleViewDetails(appraisal)}
-                              >
-                                View Details
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={6} sx={{ textAlign: 'center', py: 4 }}>
-                            <Typography variant="body2" color="text.secondary">
-                              No appraisals found
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                  {appraisals.length > rowsPerPage && (
-                    <TablePagination
-                      rowsPerPageOptions={[5, 10, 25]}
-                      component="div"
-                      count={appraisals.length}
-                      rowsPerPage={rowsPerPage}
-                      page={page}
-                      onPageChange={handleChangePage}
-                      onRowsPerPageChange={handleChangeRowsPerPage}
-                      sx={{
-                        borderTop: '1px solid #f0f0f0',
-                        '& .MuiTablePagination-toolbar': {
-                          padding: '0 16px'
-                        }
-                      }}
-                    />
-                  )}
-                </>
-              )}
+        {appraisal.status === 'reviewed' && (
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography variant="h6">Manager Feedback</Typography>
+              <Typography>{appraisal.managerFeedback}</Typography>
+              <Typography variant="h6" sx={{ mt: 2 }}>Action Plan</Typography>
+              <Typography>{appraisal.actionPlan}</Typography>
+              <Typography variant="h6" sx={{ mt: 2 }}>Overall Rating: {appraisal.overallRating}/5</Typography>
             </CardContent>
           </Card>
+        )}
 
-          {/* New Appraisal Modal */}
-          <Modal open={openModal} onClose={() => setOpenModal(false)}>
-            <Box sx={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: { xs: '90%', sm: '600px' },
-              bgcolor: 'background.paper',
-              borderRadius: '8px',
-              boxShadow: 24,
-              p: 3,
-              outline: 'none',
-              border: '1px solid #e0e0e0',
-              maxHeight: '90vh',
-              overflowY: 'auto'
-            }}>
-              <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                mb: 2 
-              }}>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  New Appraisal Request
-                </Typography>
-                <IconButton 
-                  onClick={() => setOpenModal(false)}
-                  sx={{
-                    '&:hover': {
-                      backgroundColor: 'action.hover',
-                    }
-                  }}
-                >
-                  <Close />
-                </IconButton>
-              </Box>
-              <Divider sx={{ mb: 3 }} />
-              <form onSubmit={handleSubmit}>
-                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                  <TextField
-                    fullWidth
-                    label="Period (e.g. Q1 2025)"
-                    name="period"
-                    value={formData.period}
-                    onChange={handleChange}
-                    required
-                  />
-                  <TextField
-                    fullWidth
-                    label="Project Name"
-                    name="projectName"
-                    value={formData.projectName}
-                    onChange={handleChange}
-                  />
-                </Box>
+        <Formik
+          initialValues={initialValues}
+          validationSchema={validationSchema}
+          onSubmit={handleSubmit}
+          enableReinitialize
+        >
+          {({ values, isSubmitting }) => (
+            <Form>
+              <FieldArray name="kras">
+                {() => (
+                  <Box>
+                    {values.kras.map((kra, kraIndex) => (
+                      <Paper key={kraIndex} sx={{ p: 3, mb: 3 }}>
+                        <Typography variant="h6" gutterBottom>{kra.name}</Typography>
 
-                <TextField
-                  fullWidth
-                  label="Work Summary"
-                  name="workSummary"
-                  value={formData.workSummary}
-                  onChange={handleChange}
-                  multiline
-                  rows={3}
-                  sx={{ mb: 2 }}
-                />
-
-                <TextField
-                  fullWidth
-                  label="Technologies Used (comma separated)"
-                  name="technologiesUsed"
-                  value={formData.technologiesUsed}
-                  onChange={handleChange}
-                  sx={{ mb: 2 }}
-                />
-
-                <TextField
-                  fullWidth
-                  label="Achievements (comma separated)"
-                  name="achievements"
-                  value={formData.achievements}
-                  onChange={handleChange}
-                  sx={{ mb: 2 }}
-                />
-
-                <Select
-                  fullWidth
-                  label="Self Rating (1-5)"
-                  name="selfRating"
-                  value={formData.selfRating}
-                  onChange={handleChange}
-                  sx={{ mb: 2 }}
-                >
-                  <MenuItem value={1}>1 - Needs Improvement</MenuItem>
-                  <MenuItem value={2}>2 - Developing</MenuItem>
-                  <MenuItem value={3}>3 - Meets Expectations</MenuItem>
-                  <MenuItem value={4}>4 - Exceeds Expectations</MenuItem>
-                  <MenuItem value={5}>5 - Outstanding</MenuItem>
-                </Select>
-
-                <TextField
-                  fullWidth
-                  label="Additional Comments"
-                  name="additionalComments"
-                  value={formData.additionalComments}
-                  onChange={handleChange}
-                  multiline
-                  rows={3}
-                  sx={{ mb: 2 }}
-                />
-
-                <TextField
-                  fullWidth
-                  label="Attachments (comma separated URLs)"
-                  name="attachments"
-                  value={formData.attachments}
-                  onChange={handleChange}
-                  sx={{ mb: 3 }}
-                />
-
-                <Box sx={{ 
-                  display: 'flex', 
-                  justifyContent: 'flex-end', 
-                  gap: 2 
-                }}>
-                  <Button 
-                    variant="outlined" 
-                    onClick={() => setOpenModal(false)}
-                    sx={{ 
-                      borderRadius: '8px',
-                      '&:hover': {
-                        backgroundColor: 'action.hover',
-                      }
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    variant="contained" 
-                    type="submit"
-                    sx={{ 
-                      borderRadius: '8px',
-                      '&:hover': {
-                        backgroundColor: 'primary.dark',
-                      }
-                    }}
-                  >
-                    Submit Appraisal
-                  </Button>
-                </Box>
-              </form>
-            </Box>
-          </Modal>
-
-          {/* Appraisal Details Modal */}
-          <Modal open={openDetailsModal} onClose={() => setOpenDetailsModal(false)}>
-            <Box sx={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: { xs: '90%', sm: '700px' },
-              bgcolor: 'background.paper',
-              borderRadius: '8px',
-              boxShadow: 24,
-              p: 3,
-              outline: 'none',
-              border: '1px solid #e0e0e0',
-              maxHeight: '90vh',
-              overflowY: 'auto'
-            }}>
-              <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                mb: 2 
-              }}>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  Appraisal Details
-                </Typography>
-                <IconButton 
-                  onClick={() => setOpenDetailsModal(false)}
-                  sx={{
-                    '&:hover': {
-                      backgroundColor: 'action.hover',
-                    }
-                  }}
-                >
-                  <Close />
-                </IconButton>
-              </Box>
-              <Divider sx={{ mb: 3 }} />
-
-              {selectedAppraisal && (
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Period:</Typography>
-                    <Typography>{selectedAppraisal.period}</Typography>
-                  </Box>
-
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Project Name:</Typography>
-                    <Typography>{selectedAppraisal.projectName || '-'}</Typography>
-                  </Box>
-
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Work Summary:</Typography>
-                    <Typography>{selectedAppraisal.workSummary}</Typography>
-                  </Box>
-
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Technologies Used:</Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      {selectedAppraisal.technologiesUsed?.map((tech, index) => (
-                        <Chip key={index} label={tech} size="small" />
-                      ))}
-                    </Box>
-                  </Box>
-
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Achievements:</Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      {selectedAppraisal.achievements?.map((ach, index) => (
-                        <Chip key={index} label={ach} size="small" color="success" />
-                      ))}
-                    </Box>
-                  </Box>
-
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Self Rating:</Typography>
-                    <Box sx={{ display: 'flex', gap: 3 }}>
-                      <Box>
-                        <Typography variant="body2">Technical Skills:</Typography>
-                        <Typography>{selectedAppraisal.selfRating?.technicalSkills || '-'}</Typography>
-                      </Box>
-                      <Box>
-                        <Typography variant="body2">Communication:</Typography>
-                        <Typography>{selectedAppraisal.selfRating?.communication || '-'}</Typography>
-                      </Box>
-                      <Box>
-                        <Typography variant="body2">Teamwork:</Typography>
-                        <Typography>{selectedAppraisal.selfRating?.teamwork || '-'}</Typography>
-                      </Box>
-                    </Box>
-                  </Box>
-
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Additional Comments:</Typography>
-                    <Typography>{selectedAppraisal.additionalComments || '-'}</Typography>
-                  </Box>
-
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Attachments:</Typography>
-                    {selectedAppraisal.attachments?.length > 0 ? (
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        {selectedAppraisal.attachments.map((url, index) => (
-                          <Chip 
-                            key={index} 
-                            label={`Attachment ${index + 1}`} 
-                            size="small" 
-                            color="info"
-                            component="a"
-                            href={url}
-                            target="_blank"
-                            clickable
+                        <Box sx={{ mb: 2 }}>
+                          <Typography>Self Rating</Typography>
+                          <Rating
+                            name={`kras[${kraIndex}].selfRating`}
+                            value={Number(kra.selfRating)}
+                            precision={1}
+                            readOnly
                           />
+                        </Box>
+
+                        <Box sx={{ mb: 2 }}>
+                          <Typography>Achievements</Typography>
+                          <Typography>{kra.achievements}</Typography>
+                        </Box>
+
+                        <Box sx={{ mb: 2 }}>
+                          <Typography>Areas to Improve</Typography>
+                          <Typography>{kra.areasToImprove}</Typography>
+                        </Box>
+
+                        <Typography variant="subtitle1" sx={{ mt: 2 }}>KPIs</Typography>
+                        {kra.kpis.map((kpi, kpiIndex) => (
+                          <Box key={kpiIndex} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                            <Typography sx={{ flex: 1 }}>{kpi.name} (Target: {kpi.target})</Typography>
+                            <Rating
+                              name={`kras[${kraIndex}].kpis[${kpiIndex}].selfRating`}
+                              value={Number(kpi.selfRating)}
+                              precision={1}
+                              readOnly
+                            />
+                          </Box>
                         ))}
+                      </Paper>
+                    ))}
+                  </Box>
+                )}
+              </FieldArray>
+
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+                <Button
+                  variant="contained"
+                  onClick={() => navigate('/employee')}
+                >
+                  Back
+                </Button>
+              </Box>
+            </Form>
+          )}
+        </Formik>
+      </Container>
+    );
+  }
+
+  return (
+    <Container maxWidth="md" sx={{ mt: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        {appraisal ? 'Update Appraisal' : 'Create New Appraisal'} - {appraisal?.period || 'Q1'} {appraisal?.year || new Date().getFullYear()}
+      </Typography>
+
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
+
+      <Formik
+        initialValues={initialValues}
+        validationSchema={validationSchema}
+        onSubmit={handleSubmit}
+        enableReinitialize
+      >
+        {({ 
+          values, 
+          errors, 
+          touched, 
+          handleChange, 
+          handleBlur, 
+          isSubmitting,
+          submitForm,
+          setSubmitting
+        }) => (
+          <Form>
+            <FieldArray name="kras">
+              {() => (
+                <Box>
+                  {values.kras.map((kra, kraIndex) => (
+                    <Paper key={kraIndex} sx={{ p: 3, mb: 3 }}>
+                      <Typography variant="h6" gutterBottom>{kra.name}</Typography>
+
+                      <Box sx={{ mb: 2 }}>
+                        <Typography>Self Rating</Typography>
+                        <Rating
+                          name={`kras[${kraIndex}].selfRating`}
+                          value={Number(values.kras[kraIndex].selfRating)}
+                          onChange={(e, newValue) => {
+                            handleChange({
+                              target: {
+                                name: `kras[${kraIndex}].selfRating`,
+                                value: newValue
+                              }
+                            });
+                          }}
+                          precision={1}
+                        />
+                        {errors.kras?.[kraIndex]?.selfRating && touched.kras?.[kraIndex]?.selfRating && (
+                          <Typography color="error">{errors.kras[kraIndex].selfRating}</Typography>
+                        )}
                       </Box>
-                    ) : (
-                      <Typography>-</Typography>
-                    )}
-                  </Box>
 
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Status:</Typography>
-                    <Chip 
-                      label={selectedAppraisal.status} 
-                      color={getStatusColor(selectedAppraisal.status)}
-                      size="small"
-                    />
-                  </Box>
+                      <Box sx={{ mb: 2 }}>
+                        <Typography>Achievements</Typography>
+                        <TextField
+                          name={`kras[${kraIndex}].achievements`}
+                          value={values.kras[kraIndex].achievements}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          fullWidth
+                          multiline
+                          rows={3}
+                          error={Boolean(errors.kras?.[kraIndex]?.achievements && touched.kras?.[kraIndex]?.achievements)}
+                          helperText={errors.kras?.[kraIndex]?.achievements && touched.kras?.[kraIndex]?.achievements ? errors.kras[kraIndex].achievements : ''}
+                        />
+                      </Box>
 
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Submitted At:</Typography>
-                    <Typography>
-                      {new Date(selectedAppraisal.submittedAt).toLocaleString()}
-                    </Typography>
-                  </Box>
+                      <Box sx={{ mb: 2 }}>
+                        <Typography>Areas to Improve</Typography>
+                        <TextField
+                          name={`kras[${kraIndex}].areasToImprove`}
+                          value={values.kras[kraIndex].areasToImprove}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          fullWidth
+                          multiline
+                          rows={3}
+                          error={Boolean(errors.kras?.[kraIndex]?.areasToImprove && touched.kras?.[kraIndex]?.areasToImprove)}
+                          helperText={errors.kras?.[kraIndex]?.areasToImprove && touched.kras?.[kraIndex]?.areasToImprove ? errors.kras[kraIndex].areasToImprove : ''}
+                        />
+                      </Box>
+
+                      <Typography variant="subtitle1" sx={{ mt: 2 }}>KPIs</Typography>
+                      {kra.kpis.map((kpi, kpiIndex) => (
+                        <Box key={kpiIndex} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                          <Typography sx={{ flex: 1 }}>{kpi.name} (Target: {kpi.target})</Typography>
+                          <Rating
+                            name={`kras[${kraIndex}].kpis[${kpiIndex}].selfRating`}
+                            value={Number(values.kras[kraIndex].kpis[kpiIndex].selfRating)}
+                            onChange={(e, newValue) => {
+                              handleChange({
+                                target: {
+                                  name: `kras[${kraIndex}].kpis[${kpiIndex}].selfRating`,
+                                  value: newValue
+                                }
+                              });
+                            }}
+                            precision={1}
+                          />
+                        </Box>
+                      ))}
+                    </Paper>
+                  ))}
                 </Box>
               )}
+            </FieldArray>
+
+            <Paper sx={{ p: 3, mb: 3 }}>
+              <Typography variant="h6" gutterBottom>Additional Comments</Typography>
+              <TextField
+                name="additionalComments"
+                value={values.additionalComments}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                fullWidth
+                multiline
+                rows={3}
+              />
+            </Paper>
+
+            <Paper sx={{ p: 3, mb: 3 }}>
+              <Typography variant="h6" gutterBottom>Career Goals</Typography>
+              <TextField
+                name="careerGoals"
+                value={values.careerGoals}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                fullWidth
+                multiline
+                rows={3}
+              />
+            </Paper>
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+              <Button
+                variant="contained"
+                color="primary"
+                type="submit"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? <CircularProgress size={24} /> : 'Save Draft'}
+              </Button>
+
+              <Button
+                variant="contained"
+                color="success"
+                type="button"
+                onClick={async () => {
+                  await submitForm();
+                  if (Object.keys(errors).length === 0) {
+                    handleSubmitAppraisal(values, { setSubmitting });
+                  }
+                }}
+                disabled={isSubmitting || Object.keys(errors).length > 0}
+              >
+                Submit for Review
+              </Button>
             </Box>
-          </Modal>
-        </Box>
-      </Box>
-    </DashboardLayout>
+          </Form>
+        )}
+      </Formik>
+    </Container>
   );
 };
 
-export default AppraisalFormAndList;
+export default EmployeeDashboard;

@@ -1,261 +1,276 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import {
-  Box,
-  Typography,
-  TextField,
-  Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  IconButton,
-  TablePagination,
-  Select,
-  MenuItem,
-  Divider,
-  Chip
+import React, { useState, useEffect } from 'react';
+import { 
+  Container, Typography, Box, Button, Paper, 
+  Table, TableBody, TableCell, TableContainer, 
+  TableHead, TableRow, Alert, CircularProgress,
+  TextField, MenuItem, Dialog, DialogTitle,
+  DialogContent, DialogActions, FormControl,Rating,
+  InputLabel, Select
 } from '@mui/material';
-import { Search, Close, Visibility } from '@mui/icons-material';
+import axios from 'axios';
 
-const AdminAppraisalPage = () => {
+const AdminDashboard = () => {
   const [appraisals, setAppraisals] = useState([]);
-  const [managerFilter, setManagerFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [userDetails, setUserDetails] = useState(null);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
-  const [loading, setLoading] = useState(false);
-  const token = localStorage.getItem('token');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [openDialog, setOpenDialog] = useState(false);
+  const [filter, setFilter] = useState({
+    status: '',
+    period: '',
+    year: ''
+  });
+  const [templateData, setTemplateData] = useState({
+    period: 'Q1',
+    year: new Date().getFullYear(),
+    kras: [
+      {
+        name: 'Code Quality',
+        kpis: [
+          { name: 'Code review pass rate', target: '90%+' },
+          { name: 'Defect leakage', target: '<5%' },
+          { name: 'Coding standards', target: '100% adherence' }
+        ]
+      },
+      {
+        name: 'On-Time Delivery',
+        kpis: [
+          { name: 'Sprint completion', target: '95%' },
+          { name: 'Scope creep', target: '<10%' }
+        ]
+      }
+    ]
+  });
+
+  useEffect(() => {
+    fetchAppraisals();
+  }, [filter]);
 
   const fetchAppraisals = async () => {
     try {
       setLoading(true);
-      let url = 'http://localhost:5000/api/admin/appraisals?';
-      if (managerFilter) url += `managerId=${managerFilter}&`;
-      if (statusFilter) url += `status=${statusFilter}`;
-
-      const res = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: true,
+      const params = {};
+      if (filter.status) params.status = filter.status;
+      if (filter.period) params.period = filter.period;
+      if (filter.year) params.year = filter.year;
+      
+      const { data } = await axios.get('http://localhost:5000/api/admin/appraisals', {
+        params,
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
-
-      setAppraisals(res.data.appraisals);
+      setAppraisals(data);
     } catch (err) {
-      console.error('Error fetching appraisals:', err);
+      setError(err.response?.data?.message || 'Failed to fetch appraisals');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchUserDetails = async (id) => {
+  const handleCreateTemplate = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/admin/user/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: true,
+      await axios.post('http://localhost:5000/api/admin/appraisals', templateData, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
-      setUserDetails(res.data.user);
+      setSuccess('Appraisal template created successfully');
+      setOpenDialog(false);
+      fetchAppraisals();
     } catch (err) {
-      console.error('Error fetching user:', err);
+      setError(err.response?.data?.message || 'Failed to create template');
     }
   };
 
-  useEffect(() => {
-    fetchAppraisals();
-  }, [managerFilter, statusFilter]);
-
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  const getStatusColor = (status) => {
-    switch (status.toLowerCase()) {
-      case 'completed': return 'success';
-      case 'pending': return 'warning';
-      case 'in progress': return 'info';
-      case 'approved': return 'primary';
-      case 'rejected': return 'error';
-      default: return 'default';
-    }
-  };
+  if (loading) return <CircularProgress />;
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1">Appraisal Management</Typography>
+    <Container maxWidth="lg" sx={{ mt: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        Appraisal Management
+      </Typography>
+      
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
+      
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <FormControl sx={{ minWidth: 120 }}>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={filter.status}
+              onChange={(e) => setFilter({ ...filter, status: e.target.value })}
+              label="Status"
+            >
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="draft">Draft</MenuItem>
+              <MenuItem value="submitted">Submitted</MenuItem>
+              <MenuItem value="reviewed">Reviewed</MenuItem>
+              <MenuItem value="completed">Completed</MenuItem>
+            </Select>
+          </FormControl>
+          
+          <FormControl sx={{ minWidth: 120 }}>
+            <InputLabel>Period</InputLabel>
+            <Select
+              value={filter.period}
+              onChange={(e) => setFilter({ ...filter, period: e.target.value })}
+              label="Period"
+            >
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="Q1">Q1</MenuItem>
+              <MenuItem value="Q2">Q2</MenuItem>
+              <MenuItem value="Q3">Q3</MenuItem>
+              <MenuItem value="Q4">Q4</MenuItem>
+              <MenuItem value="Annual">Annual</MenuItem>
+            </Select>
+          </FormControl>
+          
+          <TextField
+            label="Year"
+            type="number"
+            value={filter.year}
+            onChange={(e) => setFilter({ ...filter, year: e.target.value })}
+            sx={{ width: 120 }}
+          />
+        </Box>
+        
         <Button 
           variant="contained" 
           color="primary"
-          onClick={fetchAppraisals}
-          startIcon={<Search />}
+          onClick={() => setOpenDialog(true)}
         >
-          Refresh
+          Create New Appraisal Cycle
         </Button>
       </Box>
-
-      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-        <TextField
-          label="Filter by Manager ID"
-          variant="outlined"
-          size="small"
-          value={managerFilter}
-          onChange={(e) => setManagerFilter(e.target.value)}
-          placeholder="Enter manager ID"
-        />
-        <Select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          displayEmpty
-          size="small"
-          sx={{ minWidth: 200 }}
-        >
-          <MenuItem value="">All Statuses</MenuItem>
-          <MenuItem value="pending">Pending</MenuItem>
-          <MenuItem value="in progress">In Progress</MenuItem>
-          <MenuItem value="completed">Completed</MenuItem>
-          <MenuItem value="approved">Approved</MenuItem>
-          <MenuItem value="rejected">Rejected</MenuItem>
-        </Select>
-      </Box>
-
-      <Paper>
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow sx={{ backgroundColor: '#f5f5f5', height: '40px' }}>
-                <TableCell sx={{ py: 0.5, fontWeight: 'bold' }}>Employee</TableCell>
-                <TableCell sx={{ py: 0.5, fontWeight: 'bold' }}>Manager</TableCell>
-                <TableCell sx={{ py: 0.5, fontWeight: 'bold' }}>Period</TableCell>
-                <TableCell sx={{ py: 0.5, fontWeight: 'bold' }}>Project</TableCell>
-                <TableCell sx={{ py: 0.5, fontWeight: 'bold' }}>Status</TableCell>
-                <TableCell sx={{ py: 0.5, fontWeight: 'bold' }}>Rating</TableCell>
-                <TableCell sx={{ py: 0.5, fontWeight: 'bold' }}>Actions</TableCell>
+      
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Employee</TableCell>
+              <TableCell>Manager</TableCell>
+              <TableCell>Period</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Overall Rating</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {appraisals.length > 0 ? (
+              appraisals.map((appraisal) => (
+                <TableRow key={appraisal._id}>
+                  <TableCell>{appraisal.employee?.name || 'N/A'}</TableCell>
+                  <TableCell>{appraisal.manager?.name || 'N/A'}</TableCell>
+                  <TableCell>{appraisal.period} {appraisal.year}</TableCell>
+                  <TableCell>{appraisal.status}</TableCell>
+                  <TableCell>
+                    {appraisal.overallRating ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Rating value={appraisal.overallRating} precision={0.5} readOnly />
+                        <Typography sx={{ ml: 1 }}>{appraisal.overallRating}</Typography>
+                      </Box>
+                    ) : 'N/A'}
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={5} align="center">
+                  No appraisals found
+                </TableCell>
               </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 2 }}>
-                    Loading appraisals...
-                  </TableCell>
-                </TableRow>
-              ) : appraisals.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 2 }}>
-                    No appraisals found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                appraisals.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((app) => (
-                  <TableRow key={app._id} hover sx={{ height: '48px' }}>
-                    <TableCell sx={{ py: 0.5 }}>
-                      <Typography 
-                        sx={{ color: 'primary.main', cursor: 'pointer' }}
-                        onClick={() => fetchUserDetails(app.userId._id)}
-                      >
-                        {app.userId.name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell sx={{ py: 0.5 }}>
-                      <Typography 
-                        sx={{ color: 'primary.main', cursor: 'pointer' }}
-                        onClick={() => fetchUserDetails(app.managerId._id)}
-                      >
-                        {app.managerId.name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell sx={{ py: 0.5 }}>{app.period}</TableCell>
-                    <TableCell sx={{ py: 0.5 }}>{app.projectName}</TableCell>
-                    <TableCell sx={{ py: 0.5 }}>
-                      <Chip 
-                        label={app.status} 
-                        size="small"
-                        color={getStatusColor(app.status)}
-                      />
-                    </TableCell>
-                    <TableCell sx={{ py: 0.5 }}>{app.finalRating || 'N/A'}</TableCell>
-                    <TableCell sx={{ py: 0.5 }}>
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        onClick={() => fetchUserDetails(app.userId._id)}
-                      >
-                        <Visibility fontSize="small" />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
-          component="div"
-          count={appraisals.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-        />
-      </Paper>
-
-      {/* User Details Dialog */}
-      <Dialog open={Boolean(userDetails)} onClose={() => setUserDetails(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          User Details
-          <IconButton
-            aria-label="close"
-            onClick={() => setUserDetails(null)}
-            sx={{
-              position: 'absolute',
-              right: 8,
-              top: 8,
-              color: (theme) => theme.palette.grey[500],
-            }}
-          >
-            <Close />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent dividers>
-          {userDetails && (
-            <Box sx={{ p: 2 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                <strong>Name:</strong> {userDetails.name}
-              </Typography>
-              <Typography variant="subtitle1" gutterBottom>
-                <strong>Email:</strong> {userDetails.email}
-              </Typography>
-              <Typography variant="subtitle1" gutterBottom>
-                <strong>Role:</strong> {userDetails.role}
-              </Typography>
-              <Typography variant="subtitle1" gutterBottom>
-                <strong>Department:</strong> {userDetails.department || 'N/A'}
-              </Typography>
-              <Typography variant="subtitle1">
-                <strong>Position:</strong> {userDetails.position || 'N/A'}
-              </Typography>
-            </Box>
-          )}
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      
+      <Dialog 
+        open={openDialog} 
+        onClose={() => setOpenDialog(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Create New Appraisal Cycle</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <FormControl fullWidth sx={{ mb: 3 }}>
+              <InputLabel>Period</InputLabel>
+              <Select
+                value={templateData.period}
+                onChange={(e) => setTemplateData({ ...templateData, period: e.target.value })}
+                label="Period"
+              >
+                <MenuItem value="Q1">Q1</MenuItem>
+                <MenuItem value="Q2">Q2</MenuItem>
+                <MenuItem value="Q3">Q3</MenuItem>
+                <MenuItem value="Q4">Q4</MenuItem>
+                <MenuItem value="Annual">Annual</MenuItem>
+              </Select>
+            </FormControl>
+            
+            <TextField
+              label="Year"
+              type="number"
+              value={templateData.year}
+              onChange={(e) => setTemplateData({ ...templateData, year: e.target.value })}
+              fullWidth
+              sx={{ mb: 3 }}
+            />
+            
+            <Typography variant="h6" sx={{ mb: 2 }}>Key Result Areas</Typography>
+            {templateData.kras.map((kra, kraIndex) => (
+              <Paper key={kraIndex} sx={{ p: 2, mb: 2 }}>
+                <TextField
+                  label="KRA Name"
+                  value={kra.name}
+                  onChange={(e) => {
+                    const newKras = [...templateData.kras];
+                    newKras[kraIndex].name = e.target.value;
+                    setTemplateData({ ...templateData, kras: newKras });
+                  }}
+                  fullWidth
+                  sx={{ mb: 2 }}
+                />
+                
+                <Typography variant="subtitle1">KPIs</Typography>
+                {kra.kpis.map((kpi, kpiIndex) => (
+                  <Box key={kpiIndex} sx={{ display: 'flex', gap: 2, mb: 1 }}>
+                    <TextField
+                      label="KPI Name"
+                      value={kpi.name}
+                      onChange={(e) => {
+                        const newKras = [...templateData.kras];
+                        newKras[kraIndex].kpis[kpiIndex].name = e.target.value;
+                        setTemplateData({ ...templateData, kras: newKras });
+                      }}
+                      sx={{ flex: 1 }}
+                    />
+                    <TextField
+                      label="Target"
+                      value={kpi.target}
+                      onChange={(e) => {
+                        const newKras = [...templateData.kras];
+                        newKras[kraIndex].kpis[kpiIndex].target = e.target.value;
+                        setTemplateData({ ...templateData, kras: newKras });
+                      }}
+                      sx={{ flex: 1 }}
+                    />
+                  </Box>
+                ))}
+              </Paper>
+            ))}
+          </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setUserDetails(null)}>Close</Button>
+          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            color="primary"
+            onClick={handleCreateTemplate}
+          >
+            Create Appraisal Cycle
+          </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </Container>
   );
 };
 
-export default AdminAppraisalPage;
+export default AdminDashboard;

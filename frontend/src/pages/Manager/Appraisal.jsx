@@ -1,502 +1,256 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import {
-  Box,
-  Typography,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TablePagination,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Divider,
-  Chip,
-  Avatar,
-  LinearProgress,
-  IconButton,
-  Tooltip,
-  Grid,
-  CircularProgress
+import React, { useState, useEffect } from 'react';
+import { 
+  Container, Typography, Box, Button, Paper, 
+  Table, TableBody, TableCell, TableContainer, 
+  TableHead, TableRow, Rating, TextField, Alert,
+  CircularProgress, Dialog, DialogTitle, DialogContent,
+  DialogActions
 } from '@mui/material';
-import { useSnackbar } from 'notistack';
-import ManagerLayout from '../../components/Layout/ManagerLayout';
-import {
-  CheckCircle as ApproveIcon,
-  Cancel as RejectIcon,
-  Visibility as ViewIcon,
-  Close as CloseIcon,
-  Star as RatingIcon
-} from '@mui/icons-material';
+import axios from 'axios';
+import { Formik, Form, FieldArray } from 'formik';
 
-const ManagerAppraisal = () => {
+const ManagerDashboard = () => {
   const [appraisals, setAppraisals] = useState([]);
   const [selectedAppraisal, setSelectedAppraisal] = useState(null);
-  const [comment, setComment] = useState('');
-  const [rating, setRating] = useState('');
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
-  const [actionType, setActionType] = useState('');
-  const [processing, setProcessing] = useState(false);
-  const { enqueueSnackbar } = useSnackbar();
 
   useEffect(() => {
+    const fetchAppraisals = async () => {
+      try {
+        const { data } = await axios.get('http://localhost:5000/api/manager/appraisals', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        setAppraisals(data);
+      } catch (err) {
+        setError(err.response?.data?.message || 'Failed to fetch appraisals');
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchAppraisals();
   }, []);
 
-  const fetchAppraisals = async () => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:5000/api/manager/appraisal', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setAppraisals(res.data);
-    } catch (err) {
-      console.error('Failed to fetch appraisals', err);
-      enqueueSnackbar('Failed to load appraisals', { variant: 'error' });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const handleReview = async (id) => {
-    setProcessing(true);
-    try {
-      const token = localStorage.getItem('token');
-      
-      // Convert rating to number
-      const finalRating = Number(rating);
-
-      const requestData = {
-        managerComment: comment,
-        finalRating: finalRating,
-        status: 'reviewed'
-      };
-
-      await axios.put(
-        `http://localhost:5000/api/manager/appraisal/review/${id}`,
-        requestData,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
-      handleCloseDialog();
-      fetchAppraisals();
-      enqueueSnackbar('Appraisal approved successfully', { variant: 'success' });
-    } catch (err) {
-      console.error('Review failed', err);
-      enqueueSnackbar(err.response?.data?.message || 'Failed to approve appraisal', { variant: 'error' });
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleReject = async (id) => {
-    setProcessing(true);
-    try {
-      const token = localStorage.getItem('token');
-      
-      const requestData = {
-        managerComment: comment,
-        status: 'rejected'
-      };
-
-      await axios.put(
-        `http://localhost:5000/api/manager/appraisal/reject/${id}`,
-        requestData,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
-      handleCloseDialog();
-      fetchAppraisals();
-      enqueueSnackbar('Appraisal rejected successfully', { variant: 'success' });
-    } catch (err) {
-      console.error('Rejection failed', err);
-      enqueueSnackbar(err.response?.data?.message || 'Failed to reject appraisal', { variant: 'error' });
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  const handleOpenDialog = (appraisal, type) => {
+  const handleReviewClick = (appraisal) => {
     setSelectedAppraisal(appraisal);
-    setActionType(type);
     setOpenDialog(true);
-    setComment(appraisal.managerComment || '');
-    setRating(appraisal.finalRating || '');
   };
 
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
-    setSelectedAppraisal(null);
-    setComment('');
-    setRating('');
-    setActionType('');
-  };
-
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'pending': return 'warning';
-      case 'approved': return 'success';
-      case 'rejected': return 'error';
-      case 'submitted': return 'info';
-      case 'draft': return 'default';
-      case 'reviewed': return 'success';
-      default: return 'default';
-    }
-  };
-
-  const renderRating = (ratingData) => {
-    if (!ratingData) return 'N/A';
-    
-    if (typeof ratingData === 'object') {
-      return (
-        <Box>
-          <Typography variant="body2">Technical: {ratingData.technicalSkills || 'N/A'}</Typography>
-          <Typography variant="body2">Communication: {ratingData.communication || 'N/A'}</Typography>
-          <Typography variant="body2">Teamwork: {ratingData.teamwork || 'N/A'}</Typography>
-        </Box>
+  const handleSubmitReview = async (values) => {
+    try {
+      const { data } = await axios.put(
+        `http://localhost:5000/api/manager/appraisals/${values._id}`,
+        values,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        }
       );
+      
+      setAppraisals(appraisals.map(a => a._id === data._id ? data : a));
+      setSuccess('Appraisal reviewed successfully');
+      setOpenDialog(false);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to submit review');
     }
-    
-    return (
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <RatingIcon color="warning" sx={{ mr: 0.5 }} />
-        {ratingData}
-      </Box>
-    );
   };
+
+  if (loading) return <CircularProgress />;
 
   return (
-    <ManagerLayout>
-      <Box sx={{ p: 3 }}>
-        <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-          Appraisal Reviews
-        </Typography>
-
-        <Paper elevation={3} sx={{ p: 2, mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            Pending Appraisal Reviews
-          </Typography>
-
-          {loading ? (
-            <LinearProgress />
-          ) : appraisals.length === 0 ? (
-            <Typography variant="body1" sx={{ p: 2, textAlign: 'center' }}>
-              No appraisals assigned to you yet.
-            </Typography>
-          ) : (
-            <>
-              <TableContainer>
-                <Table>
-                  <TableHead>
-                    <TableRow sx={{ backgroundColor: 'primary.light' }}>
-                      <TableCell sx={{ color: 'white' }}>Employee</TableCell>
-                      <TableCell sx={{ color: 'white' }}>Project</TableCell>
-                      <TableCell sx={{ color: 'white' }}>Period</TableCell>
-                      <TableCell sx={{ color: 'white' }}>Self Rating</TableCell>
-                      <TableCell sx={{ color: 'white' }}>Status</TableCell>
-                      <TableCell sx={{ color: 'white' }}>Submitted On</TableCell>
-                      <TableCell sx={{ color: 'white' }}>Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {appraisals
-                      .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                      .map((appraisal) => (
-                        <TableRow key={appraisal._id} hover>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <Avatar
-                                src={typeof appraisal.userId === 'object' ? appraisal.userId.image : '/default-avatar.png'}
-                                sx={{ mr: 2, width: 36, height: 36 }}
-                              />
-                              {typeof appraisal.userId === 'object' ? appraisal.userId.name : appraisal.userId}
-                            </Box>
-                          </TableCell>
-                          <TableCell>{appraisal.projectName}</TableCell>
-                          <TableCell>{appraisal.period}</TableCell>
-                          <TableCell>
-                            {renderRating(appraisal.selfRating)}
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              label={appraisal.status}
-                              color={getStatusColor(appraisal.status)}
-                              size="small"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            {appraisal.submittedAt ? new Date(appraisal.submittedAt).toLocaleDateString() : 'N/A'}
-                          </TableCell>
-                          <TableCell>
-                            <Tooltip title="View Details">
-                              <IconButton
-                                color="primary"
-                                onClick={() => handleOpenDialog(appraisal, 'view')}
-                              >
-                                <ViewIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Approve">
-                              <IconButton
-                                color="success"
-                                onClick={() => handleOpenDialog(appraisal, 'review')}
-                                disabled={appraisal.status !== 'Submitted' && appraisal.status !== 'submitted'}
-                              >
-                                <ApproveIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Reject">
-                              <IconButton
-                                color="error"
-                                onClick={() => handleOpenDialog(appraisal, 'reject')}
-                                disabled={appraisal.status !== 'Submitted' && appraisal.status !== 'submitted'}
-                              >
-                                <RejectIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-              <TablePagination
-                rowsPerPageOptions={[5, 10, 25]}
-                component="div"
-                count={appraisals.length}
-                rowsPerPage={rowsPerPage}
-                page={page}
-                onPageChange={handleChangePage}
-                onRowsPerPageChange={handleChangeRowsPerPage}
-              />
-            </>
-          )}
-        </Paper>
-
-        {/* Appraisal Detail Dialog */}
-        <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-          <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Box>
-              {actionType === 'view' && 'Appraisal Details'}
-              {actionType === 'review' && 'Approve Appraisal'}
-              {actionType === 'reject' && 'Reject Appraisal'}
-            </Box>
-            <IconButton onClick={handleCloseDialog}>
-              <CloseIcon />
-            </IconButton>
+    <Container maxWidth="lg" sx={{ mt: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        Appraisals to Review
+      </Typography>
+      
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
+      
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Employee</TableCell>
+              <TableCell>Department</TableCell>
+              <TableCell>Period</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Action</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {appraisals.length > 0 ? (
+              appraisals.map((appraisal) => (
+                <TableRow key={appraisal._id}>
+                  <TableCell>{appraisal.employee.name}</TableCell>
+                  <TableCell>{appraisal.employee.Department}</TableCell>
+                  <TableCell>{appraisal.period} {appraisal.year}</TableCell>
+                  <TableCell>{appraisal.status}</TableCell>
+                  <TableCell>
+                    <Button 
+                      variant="contained" 
+                      onClick={() => handleReviewClick(appraisal)}
+                    >
+                      Review
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={5} align="center">
+                  No appraisals to review
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      
+      {selectedAppraisal && (
+        <Dialog 
+          open={openDialog} 
+          onClose={() => setOpenDialog(false)}
+          fullWidth
+          maxWidth="md"
+        >
+          <DialogTitle>
+            Review Appraisal - {selectedAppraisal.employee.name}
           </DialogTitle>
-
-          <DialogContent dividers>
-            {selectedAppraisal && (
-              <Box>
-                <Box sx={{ display: 'flex', mb: 3 }}>
-                  <Avatar
-                    src={typeof selectedAppraisal.userId === 'object' ? selectedAppraisal.userId.image : '/default-avatar.png'}
-                    sx={{ width: 64, height: 64, mr: 2 }}
+          <DialogContent>
+            <Formik
+              initialValues={selectedAppraisal}
+              onSubmit={handleSubmitReview}
+            >
+              {({ values, handleChange, isSubmitting }) => (
+                <Form>
+                  <FieldArray name="kras">
+                    {() => (
+                      <Box sx={{ mt: 2 }}>
+                        {values.kras.map((kra, kraIndex) => (
+                          <Paper key={kraIndex} sx={{ p: 2, mb: 2 }}>
+                            <Typography variant="h6">{kra.name}</Typography>
+                            
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                              <Typography sx={{ mr: 2 }}>Employee Rating:</Typography>
+                              <Rating value={kra.selfRating} readOnly precision={0.5} />
+                            </Box>
+                            
+                            <Box sx={{ mb: 2 }}>
+                              <Typography>Achievements:</Typography>
+                              <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+                                {kra.achievements}
+                              </Typography>
+                            </Box>
+                            
+                            <Box sx={{ mb: 2 }}>
+                              <Typography>Areas to Improve:</Typography>
+                              <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+                                {kra.areasToImprove}
+                              </Typography>
+                            </Box>
+                            
+                            <Typography variant="subtitle1">KPIs</Typography>
+                            {kra.kpis.map((kpi, kpiIndex) => (
+                              <Box key={kpiIndex} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                <Typography sx={{ flex: 1 }}>
+                                  {kpi.name} (Target: {kpi.target})
+                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                  <Typography sx={{ mr: 1 }}>Emp:</Typography>
+                                  <Rating value={kpi.selfRating} readOnly precision={0.5} size="small" />
+                                  <Typography sx={{ mx: 1 }}>Mgr:</Typography>
+                                  <Rating
+                                    name={`kras[${kraIndex}].kpis[${kpiIndex}].managerRating`}
+                                    value={Number(values.kras[kraIndex].kpis[kpiIndex].managerRating)}
+                                    onChange={handleChange}
+                                    precision={0.5}
+                                    size="small"
+                                  />
+                                </Box>
+                              </Box>
+                            ))}
+                            
+                            <Box sx={{ mt: 2 }}>
+                              <Typography>Manager Rating:</Typography>
+                              <Rating
+                                name={`kras[${kraIndex}].managerRating`}
+                                value={Number(values.kras[kraIndex].managerRating)}
+                                onChange={handleChange}
+                                precision={0.5}
+                              />
+                            </Box>
+                          </Paper>
+                        ))}
+                      </Box>
+                    )}
+                  </FieldArray>
+                  
+                  <Paper sx={{ p: 2, mb: 2 }}>
+                    <Typography variant="h6">Additional Comments</Typography>
+                    <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+                      {values.additionalComments || 'No additional comments'}
+                    </Typography>
+                  </Paper>
+                  
+                  <Paper sx={{ p: 2, mb: 2 }}>
+                    <Typography variant="h6">Career Goals</Typography>
+                    <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+                      {values.careerGoals || 'No career goals specified'}
+                    </Typography>
+                  </Paper>
+                  
+                  <TextField
+                    name="managerFeedback"
+                    label="Manager Feedback"
+                    value={values.managerFeedback}
+                    onChange={handleChange}
+                    fullWidth
+                    multiline
+                    rows={4}
+                    sx={{ mb: 2 }}
                   />
-                  <Box>
-                    <Typography variant="h6">
-                      {typeof selectedAppraisal.userId === 'object' ? selectedAppraisal.userId.name : selectedAppraisal.userId}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {selectedAppraisal.projectName} • {selectedAppraisal.period}
-                    </Typography>
-                    <Chip
-                      label={selectedAppraisal.status}
-                      color={getStatusColor(selectedAppraisal.status)}
-                      sx={{ mt: 1 }}
+                  
+                  <TextField
+                    name="actionPlan"
+                    label="Action Plan"
+                    value={values.actionPlan}
+                    onChange={handleChange}
+                    fullWidth
+                    multiline
+                    rows={4}
+                    sx={{ mb: 2 }}
+                  />
+                  
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <Typography sx={{ mr: 2 }}>Overall Rating:</Typography>
+                    <Rating
+                      name="overallRating"
+                      value={Number(values.overallRating)}
+                      onChange={handleChange}
+                      precision={0.5}
                     />
                   </Box>
-                </Box>
-
-                <Divider sx={{ my: 2 }} />
-
-                <Grid container spacing={3}>
-                  <Grid item xs={12} md={6}>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                        Work Summary
-                      </Typography>
-                      <Typography variant="body1" sx={{ whiteSpace: 'pre-line', mb: 2 }}>
-                        {selectedAppraisal.workSummary || 'No work summary provided.'}
-                      </Typography>
-                    </Box>
-
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                        Technologies Used
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        {selectedAppraisal.technologiesUsed?.length > 0 ? (
-                          selectedAppraisal.technologiesUsed.map((tech, index) => (
-                            <Chip key={index} label={tech} variant="outlined" />
-                          ))
-                        ) : (
-                          <Typography variant="body2">No technologies listed</Typography>
-                        )}
-                      </Box>
-                    </Box>
-                  </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                        Achievements
-                      </Typography>
-                      {selectedAppraisal.achievements?.length > 0 ? (
-                        <ul style={{ paddingLeft: 20 }}>
-                          {selectedAppraisal.achievements.map((achievement, index) => (
-                            <li key={index}>
-                              <Typography variant="body1">{achievement}</Typography>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <Typography variant="body2">No achievements listed</Typography>
-                      )}
-                    </Box>
-
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                        Additional Comments
-                      </Typography>
-                      <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
-                        {selectedAppraisal.additionalComments || 'No additional comments'}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-
-                <Divider sx={{ my: 2 }} />
-
-                <Box sx={{ mb: 3 }}>
-                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                    Employee Self-Assessment
-                  </Typography>
-                  <Typography variant="body1" sx={{ whiteSpace: 'pre-line', mb: 2 }}>
-                    {selectedAppraisal.selfAssessment || 'No self-assessment provided.'}
-                  </Typography>
-
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                      Self Rating:
-                    </Typography>
-                    {renderRating(selectedAppraisal.selfRating)}
-                  </Box>
-                </Box>
-
-                {selectedAppraisal.managerComment && (
-                  <>
-                    <Divider sx={{ my: 2 }} />
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                        Manager's Feedback
-                      </Typography>
-                      <Typography variant="body1" sx={{ whiteSpace: 'pre-line', mb: 2 }}>
-                        {selectedAppraisal.managerComment}
-                      </Typography>
-                      {selectedAppraisal.finalRating && (
-                        <Box>
-                          <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                            Final Rating:
-                          </Typography>
-                          {renderRating(selectedAppraisal.finalRating)}
-                        </Box>
-                      )}
-                    </Box>
-                  </>
-                )}
-
-                {(actionType === 'review' || actionType === 'reject') && (
-                  <>
-                    <Divider sx={{ my: 2 }} />
-                    <Box sx={{ mt: 3 }}>
-                      <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                        {actionType === 'review' ? 'Your Review' : 'Rejection Reason'}
-                      </Typography>
-
-                      <TextField
-                        fullWidth
-                        multiline
-                        rows={4}
-                        variant="outlined"
-                        label="Comments"
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                        sx={{ mb: 2 }}
-                        required
-                      />
-
-                      {actionType === 'review' && (
-                        <TextField
-                          fullWidth
-                          type="number"
-                          variant="outlined"
-                          label="Final Rating (1-5)"
-                          value={rating}
-                          onChange={(e) => setRating(e.target.value)}
-                          inputProps={{ min: 1, max: 5 }}
-                          sx={{ mb: 2 }}
-                          required
-                        />
-                      )}
-                    </Box>
-                  </>
-                )}
-              </Box>
-            )}
+                  
+                  <DialogActions>
+                    <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
+                    <Button 
+                      type="submit" 
+                      variant="contained" 
+                      color="primary"
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? <CircularProgress size={24} /> : 'Submit Review'}
+                    </Button>
+                  </DialogActions>
+                </Form>
+              )}
+            </Formik>
           </DialogContent>
-
-          <DialogActions sx={{ p: 2 }}>
-            <Button onClick={handleCloseDialog} color="secondary" variant="outlined">
-              Cancel
-            </Button>
-            {actionType === 'review' && (
-              <Button
-                onClick={() => handleReview(selectedAppraisal._id)}
-                color="success"
-                variant="contained"
-                disabled={processing || !comment || !rating}
-              >
-                {processing ? <CircularProgress size={24} /> : 'Submit Approval'}
-              </Button>
-            )}
-            {actionType === 'reject' && (
-              <Button
-                onClick={() => handleReject(selectedAppraisal._id)}
-                color="error"
-                variant="contained"
-                disabled={processing || !comment}
-              >
-                {processing ? <CircularProgress size={24} /> : 'Confirm Rejection'}
-              </Button>
-            )}
-          </DialogActions>
         </Dialog>
-      </Box>
-    </ManagerLayout>
+      )}
+    </Container>
   );
 };
 
-export default ManagerAppraisal;
+export default ManagerDashboard;

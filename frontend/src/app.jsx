@@ -16,7 +16,7 @@ import ManagerPolicyPage from './pages/Manager/Policy';
 import ExpenseTracker1 from './pages/Manager/Expense';
 import ManagerLeave from './pages/Manager/Leave';
 import ManagerReviewDashboard from './pages/Manager/Review';
-import ManagerAppraisal from './pages/Manager/Appraisal';
+import ManagerReviewDialog from './pages/Manager/Appraisal';
 
 import AdminUsers from './pages/Admin/AdminUsers';
 import AdminExpenses from './pages/Admin/AdminExpense';
@@ -45,7 +45,7 @@ function App() {
         <Route path="/manager/expense" element={<ExpenseTracker1 />} />
         <Route path="/manager/leave" element={<ManagerLeave />} />
         <Route path="/manager/review" element={<ManagerReviewDashboard />} />
-        <Route path="/manager/appraisal" element={<ManagerAppraisal />} />
+        <Route path="/manager/appraisal" element={<ManagerReviewDialog />} />
 
         <Route path="/admin" element={<AdminLayout />}>
           <Route path="users" element={<AdminUsers />} />

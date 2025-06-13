@@ -13,6 +13,7 @@
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.9.0",
     "date-fns": "^4.1.0",
+    "formik": "^2.4.6",
     "gridfs-stream": "^1.1.1",
     "multer-gridfs-storage": "^5.0.2",
     "notistack": "^3.0.2",
@@ -22,10 +23,12 @@
     "react-bootstrap": "^2.10.10",
     "react-dom": "^19.1.0",
     "react-pdf": "^9.2.1",
-    "react-router-dom": "^7.6.1",
+    "react-router-dom": "^7.6.2",
     "react-scripts": "5.0.1",
     "react-toastify": "^11.0.5",
-    "web-vitals": "^2.1.4"
+    "recharts": "^2.15.3",
+    "web-vitals": "^2.1.4",
+    "yup": "^1.6.1"
   },
   "scripts": {
     "start": "react-scripts start",

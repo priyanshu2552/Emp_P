@@ -18,9 +18,9 @@ const managerLeave = require('../controllers/ManagerControllers/managerLeave');
 const { getEmployeesForManager, submitReview, getManagerReviews } = require('../controllers/ManagerControllers/managerReview');
 const { getEmployeeDetailsById } = require('../controllers/ManagerControllers/managerReview');
 const {
-  getManagerAppraisals,
-  reviewAppraisal,
-  rejectAppraisal
+ getAppraisalsToReview,
+  getAppraisalToReview,
+  submitManagerEvaluation
 } = require('../controllers/ManagerControllers/managerAppraisal');
 const adminExpense = require('../controllers/ManagerControllers/managerExpense');
 
@@ -59,11 +59,12 @@ router.put('/expenses/review/:expenseId', managerExpense.reviewExpense);
 router.get('/expenses/:expenseId/receipt', managerExpense.getExpenseReceipt);
 
 // ----- LEAVE MANAGEMENT -----
-router.post('/leaves', managerLeave.submitLeave); // Manager submitting their own leave
-router.get('/leaves', managerLeave.getUserLeaves); // Manager viewing own leaves
-router.get('/team-leaves', managerLeave.getTeamLeaves); // Manager viewing team pending leaves
-router.post('/leaves/:id/review', managerLeave.reviewLeave); // Approve/Reject team leaves
-router.get('/leave-allocation', managerLeave.getLeaveAllocation); // Get leave allocation
+router.get('/leaves', managerLeave.getManagerLeaves);
+router.get('/leaves/team', managerLeave.getTeamLeaves);
+router.get('/leaves/allocation', managerLeave.getManagerLeaveAllocation);
+router.post('/leaves', managerLeave.createManagerLeave);
+router.post('/leaves/:leaveId/review', managerLeave.reviewTeamLeave);
+
 
 // ----- Reviews -----
 router.get('/employees', getEmployeesForManager);
@@ -72,8 +73,11 @@ router.get('/reviews', getManagerReviews);
 router.get('/employee/details/:id', getEmployeeDetailsById);
 
 // ----- Appraisals -----
-router.get('/appraisal', getManagerAppraisals);
-router.put('/appraisal/review/:id', reviewAppraisal);
-router.put('/appraisal/reject/:id', rejectAppraisal);
+router.route('/appraisals')
+  .get(authMiddleware.protect, authMiddleware.authorize('manager'), getAppraisalsToReview);
+
+router.route('/appraisals/:id')
+  .get(authMiddleware.protect, authMiddleware.authorize('manager'), getAppraisalToReview)
+  .put(authMiddleware.protect, authMiddleware.authorize('manager'), submitManagerEvaluation)
 
 module.exports = router;
