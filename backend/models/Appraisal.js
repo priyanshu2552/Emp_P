@@ -1,98 +1,105 @@
 const mongoose = require('mongoose');
 
-const kpiSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  target: { type: String, required: true },
-  weight: { type: Number, min: 1, max: 100 },
-  selfRating: { type: Number, min: 1, max: 5, default: null },
-  managerRating: { type: Number, min: 1, max: 5, default: null },
-  achievements: String,
-  areasToImprove: String
-});
-
-const kraSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  kpis: [kpiSchema],
-  selfRating: { type: Number, min: 1, max: 5, default: null },
-  managerRating: { type: Number, min: 1, max: 5, default: null },
-  achievements: String,
-  areasToImprove: String
-});
-
-const appraisalSchema = new mongoose.Schema({
-  employee: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'User', 
+const workItemSchema = new mongoose.Schema({
+  description: { type: String, required: true },
+  completionStatus: { 
+    type: String, 
+    enum: ['completed', 'in-progress', 'not-started', 'delayed'],
     required: true 
   },
+  codeQualityRating: { type: Number, min: 1, max: 5 },
+  timelyDelivery: { type: Boolean },
+  technologiesUsed: [String],
+  challenges: String,
+  solutions: String,
+  learnings: String
+}, { _id: false });
+
+const goalSchema = new mongoose.Schema({
+  description: { type: String, required: true },
+  achieved: Boolean,
+  evidence: String,
+  rating: { type: Number, min: 1, max: 5 }
+}, { _id: false });
+
+const keyResultSchema = new mongoose.Schema({
+  description: { type: String, required: true },
+  deliveredOnTime: Boolean,
+  qualityRating: { type: Number, min: 1, max: 5 },
+  comments: String
+}, { _id: false });
+
+const appraisalSchema = new mongoose.Schema({
   manager: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User', 
     required: true 
   },
-  period: { 
-    type: String, 
-    required: true,
-    enum: ['Q1', 'Q2', 'Q3', 'Q4', 'Annual'] 
+  employee: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  period: {
+    type: String,
+    enum: ['Q1', 'Q2', 'Q3', 'Q4', 'Annual'],
+    required: true
   },
   year: {
     type: Number,
     required: true,
     default: new Date().getFullYear()
   },
-  
-  // Performance Review
-  kras: [kraSchema],
-  
-  // General Review
+
+  // Work Sections
+  workItems: [workItemSchema],
+  goals: [goalSchema],
+  keyResults: [keyResultSchema],
   additionalComments: String,
-  careerGoals: String,
-  
-  // Manager Evaluation
-  managerFeedback: String,
-  actionPlan: String,
-  overallRating: { 
-    type: Number, 
-    min: 1, 
-    max: 5,
-    default: null 
+
+  // Employee Submission
+  employeeSubmission: {
+    submittedAt: Date,
+    selfRating: { type: Number, min: 1, max: 5 },
+    finalComments: String
   },
-  
+
+  // Manager Review
+  managerReview: {
+    reviewedAt: Date,
+    overallRating: { type: Number, min: 1, max: 5 },
+    feedback: String,
+    acknowledgement: Boolean,
+    actionItems: [String]
+  },
+
   // Status Tracking
   status: {
     type: String,
-    enum: ['draft', 'submitted', 'reviewed', 'completed'],
+    enum: ['draft', 'sent-to-employee', 'submitted-by-employee', 'reviewed-by-manager'],
     default: 'draft'
   },
-  submittedAt: Date,
-  reviewedAt: Date,
-  
+
   // Timestamps
   createdAt: { type: Date, default: Date.now },
   updatedAt: Date
 });
 
-// Helper method to get current period
-appraisalSchema.statics.getCurrentPeriod = function() {
-  const now = new Date();
-  const month = now.getMonth() + 1;
-  const year = now.getFullYear();
-  
-  if (month >= 1 && month <= 3) return { period: 'Q1', year };
-  if (month >= 4 && month <= 6) return { period: 'Q2', year };
-  if (month >= 7 && month <= 9) return { period: 'Q3', year };
-  if (month >= 10 && month <= 12) return { period: 'Q4', year };
-};
+// Prevent duplicate appraisals for same period
+appraisalSchema.index({ employee: 1, period: 1, year: 1 }, { unique: true });
 
 appraisalSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
+  this.updatedAt = new Date();
   
-  if (this.isModified('status')) {
-    if (this.status === 'submitted') {
-      this.submittedAt = new Date();
-    } else if (this.status === 'reviewed') {
-      this.reviewedAt = new Date();
-    }
+  // Auto-populate employee details when status changes to sent-to-employee
+  if (this.isModified('status') && this.status === 'sent-to-employee') {
+    this.employeeSubmission = this.employeeSubmission || {};
+    this.employeeSubmission.submittedAt = new Date();
+  }
+  
+  if (this.isModified('status') && this.status === 'reviewed-by-manager') {
+    this.managerReview = this.managerReview || {};
+    this.managerReview.reviewedAt = new Date();
   }
   
   next();

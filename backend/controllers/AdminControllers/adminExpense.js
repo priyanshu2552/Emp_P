@@ -37,3 +37,41 @@ exports.updateExpenseStatus = async (req, res) => {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 };
+
+exports.getExpenseReceipt = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const expense = await Expense.findById(id);
+        
+        if (!expense) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Expense not found' 
+            });
+        }
+
+        if (!expense.receipt || !expense.receipt.data) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'No receipt found for this expense' 
+            });
+        }
+
+        // Set appropriate headers
+        res.set({
+            'Content-Type': expense.receipt.contentType,
+            'Content-Disposition': `inline; filename="${expense.receipt.filename || 'receipt'}"`,
+            'Content-Length': expense.receipt.data.length
+        });
+
+        // Send the binary data
+        res.send(expense.receipt.data);
+
+    } catch (error) {
+        console.error('Error in getExpenseReceipt:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while fetching receipt'
+        });
+    }
+};

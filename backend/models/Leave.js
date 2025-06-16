@@ -58,7 +58,7 @@ const leaveSchema = new mongoose.Schema({
     ref: 'User',
     
   },
-  department: {
+  Department: {
     type: String,
     required: true
   }

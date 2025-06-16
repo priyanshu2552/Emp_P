@@ -6,22 +6,26 @@ const User = require('../../models/User');
 // Get all leave requests (filterable by status)
 exports.getAllLeaves = async (req, res) => {
   try {
-    const { status, department, leaveType } = req.query;
+    const { status, Department, leaveType, page = 1, limit = 10 } = req.query;
     const filter = {};
-
     if (status) filter.status = status;
-    if (department) filter.department = department;
+    if (Department) filter.Department = Department;
     if (leaveType) filter.leaveType = leaveType;
 
     const leaves = await Leave.find(filter)
-      .populate('userId', 'name email department')
-      .populate('reportingTo', 'name')
-      .populate('approvedBy', 'name')
+      .populate('userId', 'name email Department')
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit))
       .sort({ createdAt: -1 });
-
+    
+    const total = await Leave.countDocuments(filter);
+    
     res.status(200).json({
       success: true,
-      data: leaves
+      data: leaves,
+      total,
+      page: parseInt(page),
+      pages: Math.ceil(total / limit)
     });
   } catch (err) {
     res.status(500).json({
@@ -49,7 +53,7 @@ exports.processLeaveRequest = async (req, res) => {
 
     // Find leave request with user populated
     const leave = await Leave.findById(id)
-      .populate('userId', 'department')
+      .populate('userId', 'name email Department')
       .populate('reportingTo', 'name')
       .populate('approvedBy', 'name');
 
@@ -59,16 +63,15 @@ exports.processLeaveRequest = async (req, res) => {
         message: 'Leave request not found'
       });
     }
-     console.log(leave.userId.department);
-    // Ensure department is set
-    if (!leave.department && leave.userId?.department) {
-      console.log(leave.userId.department);
-      leave.department = leave.userId.department;
-    } else if (!leave.department) {
-      return res.status(400).json({
-        success: false,
-        message: 'Department not found on user record'
-      });
+   console.log(leave);
+    // Debug logging
+    console.log('Leave request found:', leave);
+    console.log('User Department:', leave.userId?.Department);
+
+    // Set Department from user if not already set on leave
+    if (!leave.Department && leave.userId?.Department) {
+      leave.Department = leave.userId.Department;
+      console.log('Department set from user:', leave.Department);
     }
 
     // Validate leave status

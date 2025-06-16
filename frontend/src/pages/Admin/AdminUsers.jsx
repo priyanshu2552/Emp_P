@@ -21,7 +21,10 @@ import {
   DialogContent,
   DialogActions,
   CircularProgress,
-  styled
+  styled,
+  TablePagination,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { Delete, Add } from '@mui/icons-material';
 import axios from 'axios';
@@ -56,6 +59,14 @@ const AdminUsers = () => {
     EmployeeId: ''
   });
   const [errors, setErrors] = useState({});
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
 
   const validate = () => {
     const tempErrors = {};
@@ -75,19 +86,32 @@ const AdminUsers = () => {
 
       // Fetch all users (or filtered by role)
       const res = await axios.get(
-        `http://localhost:5000/api/admin/users${roleFilter ? `?role=${roleFilter}` : ''}`,
+        `http://localhost:5000/api/admin/users?page=${page + 1}&limit=${rowsPerPage}${roleFilter ? `&role=${roleFilter}` : ''}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setUsers(res.data);
+
+      // Safely handle the response data
+      const usersData = res.data?.users || res.data || [];
+      const total = res.data?.total || usersData.length || 0;
+
+      setUsers(Array.isArray(usersData) ? usersData : []);
+      setTotalUsers(total);
 
       // Fetch just managers and admins for the dropdown
       const managersRes = await axios.get(
         'http://localhost:5000/api/admin/users?role=manager,admin',
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setManagers(managersRes.data);
+
+      const managersData = managersRes.data?.users || managersRes.data || [];
+      setManagers(Array.isArray(managersData) ? managersData : []);
     } catch (err) {
       console.error('Failed to fetch users', err);
+      setSnackbar({
+        open: true,
+        message: 'Failed to fetch users',
+        severity: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -118,10 +142,21 @@ const AdminUsers = () => {
       });
       setOpenModal(false);
       fetchUsers();
+      setSnackbar({
+        open: true,
+        message: 'User added successfully',
+        severity: 'success'
+      });
     } catch (err) {
       console.error('Failed to add user', err);
       if (err.response?.data?.message) {
-        setErrors({ ...errors, form: err.response.data.message });
+        if (err.response.data.message.includes('Employee ID')) {
+          setErrors({ ...errors, EmployeeId: err.response.data.message });
+        } else if (err.response.data.message.includes('email')) {
+          setErrors({ ...errors, email: err.response.data.message });
+        } else {
+          setErrors({ ...errors, form: err.response.data.message });
+        }
       }
     }
   };
@@ -133,14 +168,33 @@ const AdminUsers = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       fetchUsers();
+      setSnackbar({
+        open: true,
+        message: 'User deleted successfully',
+        severity: 'success'
+      });
     } catch (err) {
       console.error('Failed to delete user', err);
+      setSnackbar({
+        open: true,
+        message: 'Failed to delete user',
+        severity: 'error'
+      });
     }
+  };
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10)); // Fixed: use radix 10 and take the actual value
+    setPage(0); // Reset to first page when rows per page changes
   };
 
   useEffect(() => {
     fetchUsers();
-  }, [roleFilter]);
+  }, [roleFilter, page, rowsPerPage]);
 
   return (
     <Box sx={{ marginLeft: '3%' }}>
@@ -172,22 +226,19 @@ const AdminUsers = () => {
 
       <Box mb={4}>
         <FormControl fullWidth size="small">
-          <InputLabel>Manager</InputLabel>
+          <InputLabel>Filter by Role</InputLabel>
           <Select
-            value={newUser.manager || ''}
-            onChange={(e) => setNewUser({
-              ...newUser,
-              manager: e.target.value === '' ? null : e.target.value
-            })}
-            displayEmpty
-            label="Manager"
+            value={roleFilter}
+            onChange={(e) => {
+              setRoleFilter(e.target.value);
+              setPage(0);
+            }}
+            label="Filter by Role"
           >
-            <MenuItem value="">No Manager</MenuItem>
-            {managers.map((manager) => (
-              <MenuItem key={manager._id} value={manager._id}>
-                {manager.name} ({manager.role})
-              </MenuItem>
-            ))}
+            <MenuItem value="">All Roles</MenuItem>
+            <MenuItem value="employee">Employee</MenuItem>
+            <MenuItem value="manager">Manager</MenuItem>
+            <MenuItem value="admin">Admin</MenuItem>
           </Select>
         </FormControl>
       </Box>
@@ -197,64 +248,75 @@ const AdminUsers = () => {
           <CircularProgress />
         </Box>
       ) : (
-        <TableContainer component={Paper} elevation={3}>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Role</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Department</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user._id} hover>
-                  <TableCell>{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <Box
-                      sx={{
-                        display: 'inline-block',
-                        px: 1.5,
-                        py: 0.5,
-                        borderRadius: 1,
-                        backgroundColor:
-                          user.role === 'admin'
-                            ? '#e3f2fd'
-                            : user.role === 'manager'
-                              ? '#e8f5e9'
-                              : '#fff8e1',
-                        color:
-                          user.role === 'admin'
-                            ? '#1976d2'
-                            : user.role === 'manager'
-                              ? '#2e7d32'
-                              : '#ff8f00',
-                        fontWeight: 500
-                      }}
-                    >
-                      {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                    </Box>
-                  </TableCell>
-                  <TableCell>{user.Department || '-'}</TableCell>
-                  <TableCell>{user.EmployeeId || '-'}</TableCell>
-                  <TableCell>
-                    <IconButton
-                      color="error"
-                      size="small"
-                      onClick={() => handleDeleteUser(user._id)}
-                    >
-                      <Delete fontSize="small" />
-                    </IconButton>
-                  </TableCell>
+        <>
+          <TableContainer component={Paper} elevation={3}>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                  <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Role</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Department</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                {Array.isArray(users) && users.map((user) => (
+                  <TableRow key={user._id} hover>
+                    <TableCell>{user.name}</TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <Box
+                        sx={{
+                          display: 'inline-block',
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: 1,
+                          backgroundColor:
+                            user.role === 'admin'
+                              ? '#e3f2fd'
+                              : user.role === 'manager'
+                                ? '#e8f5e9'
+                                : '#fff8e1',
+                          color:
+                            user.role === 'admin'
+                              ? '#1976d2'
+                              : user.role === 'manager'
+                                ? '#2e7d32'
+                                : '#ff8f00',
+                          fontWeight: 500
+                        }}
+                      >
+                        {user.role?.charAt(0)?.toUpperCase() + user.role?.slice(1)}
+                      </Box>
+                    </TableCell>
+                    <TableCell>{user.Department || '-'}</TableCell>
+                    <TableCell>{user.EmployeeId || '-'}</TableCell>
+                    <TableCell>
+                      <IconButton
+                        color="error"
+                        size="small"
+                        onClick={() => handleDeleteUser(user._id)}
+                      >
+                        <Delete fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <TablePagination
+            rowsPerPageOptions={[5, 7, 9, 10]} // Added your requested options
+            component="div"
+            count={totalUsers}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
+        </>
       )}
 
       {/* Add User Modal */}
@@ -351,13 +413,11 @@ const AdminUsers = () => {
                 label="Manager"
               >
                 <MenuItem value="">No Manager</MenuItem>
-                {users
-                  .filter((u) => u.role === 'admin' || u.role === 'manager')
-                  .map((manager) => (
-                    <MenuItem key={manager._id} value={manager._id}>
-                      {manager.name} ({manager.role})
-                    </MenuItem>
-                  ))}
+                {Array.isArray(managers) && managers.map((manager) => (
+                  <MenuItem key={manager._id} value={manager._id}>
+                    {manager.name} ({manager.role})
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
           </Box>
@@ -378,6 +438,20 @@ const AdminUsers = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

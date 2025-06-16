@@ -1,130 +1,132 @@
 const Appraisal = require('../../models/Appraisal');
-const User = require('../../models/User');
 
-// Get all appraisals for employee
-exports.getEmployeeAppraisals = async (req, res) => {
+// Get all appraisals for current employee
+exports.getMyAppraisals = async (req, res) => {
   try {
     const appraisals = await Appraisal.find({ employee: req.user._id })
-      .sort({ year: -1, period: 1 })
-      .populate('manager', 'name email');
-    
-    const periodOptions = await getAvailablePeriods(req.user._id);
-    
-    res.status(200).json({ appraisals, periodOptions });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+      .populate({
+        path: 'manager',
+        select: 'name email EmployeeId'
+      })
+      .sort({ year: -1, period: 1 });
+
+    // Transform data for better frontend display
+    const transformedAppraisals = appraisals.map(appraisal => ({
+      _id: appraisal._id,
+      period: appraisal.period,
+      year: appraisal.year,
+      status: appraisal.status,
+      createdAt: appraisal.createdAt,
+      manager: appraisal.manager,
+      employeeSubmission: appraisal.employeeSubmission,
+      managerReview: appraisal.managerReview
+    }));
+
+    res.json(transformedAppraisals);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };
 
-// Get current appraisal
-exports.getCurrentAppraisal = async (req, res) => {
+// Get single appraisal form
+exports.getAppraisalForm = async (req, res) => {
   try {
-    const { period, year } = req.query;
-    const filter = { employee: req.user._id };
-    
-    if (period) filter.period = period;
-    if (year) filter.year = year;
-    
-    const appraisal = await Appraisal.findOne(filter)
-      .populate('manager', 'name email');
-    
+    const appraisal = await Appraisal.findOne({
+      _id: req.params.id,
+      employee: req.user._id
+    }).populate({
+      path: 'manager',
+      select: 'name email EmployeeId'
+    });
+
+    if (!appraisal) {
+      return res.status(404).json({ error: 'Appraisal not found' });
+    }
+
+    // Prevent access if not sent to employee
+    if (appraisal.status !== 'sent-to-employee' && 
+        appraisal.status !== 'submitted-by-employee' && 
+        appraisal.status !== 'reviewed-by-manager' && 
+        appraisal.status !== 'rejected') {
+      return res.status(403).json({ 
+        error: 'This appraisal is not available for submission' 
+      });
+    }
+
+    res.json(appraisal);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Submit appraisal form
+exports.submitAppraisalForm = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { workItems, goals, keyResults, additionalComments, selfRating, finalComments } = req.body;
+
+    const appraisal = await Appraisal.findOne({
+      _id: id,
+      employee: req.user._id,
+      status: 'sent-to-employee'
+    });
+
     if (!appraisal) {
       return res.status(404).json({ 
-        message: 'No appraisal found',
-        periodOptions: await getAvailablePeriods(req.user._id)
+        error: 'Appraisal not found or already submitted' 
       });
     }
-    
-    res.status(200).json(appraisal);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
 
-// Create/update self-evaluation
-exports.updateSelfEvaluation = async (req, res) => {
-  try {
-    const { period, year, kras, additionalComments, careerGoals } = req.body;
-    
-    let appraisal = await Appraisal.findOne({
-      employee: req.user._id,
-      period,
-      year,
-      status: 'draft'
-    });
-    
-    if (!appraisal) {
-      const employee = await User.findById(req.user._id);
-      if (!employee.manager) {
-        return res.status(400).json({ message: 'No manager assigned' });
-      }
-      
-      appraisal = new Appraisal({
-        employee: req.user._id,
-        manager: employee.manager,
-        period,
-        year,
-        status: 'draft'
-      });
+    // Validate required fields
+    if (!workItems || !goals || !keyResults || !selfRating) {
+      return res.status(400).json({ error: 'Missing required fields' });
     }
-    
-    // Update KRAs
-    if (kras) {
-      appraisal.kras = kras.map(kra => ({
-        name: kra.name,
-        kpis: kra.kpis,
-        selfRating: kra.selfRating,
-        achievements: kra.achievements,
-        areasToImprove: kra.areasToImprove
-      }));
-    }
-    
-    if (additionalComments) appraisal.additionalComments = additionalComments;
-    if (careerGoals) appraisal.careerGoals = careerGoals;
-    
+
+    // Update appraisal with employee's submission
+    appraisal.workItems = workItems;
+    appraisal.goals = goals;
+    appraisal.keyResults = keyResults;
+    appraisal.additionalComments = additionalComments;
+    appraisal.employeeSubmission = {
+      submittedAt: new Date(),
+      selfRating,
+      finalComments
+    };
+    appraisal.status = 'submitted-by-employee';
+
     await appraisal.save();
-    res.status(200).json(appraisal);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+
+    // TODO: Send notification to manager
+
+    res.json({
+      message: 'Appraisal submitted successfully',
+      appraisal
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };
 
-// Submit appraisal
-exports.submitAppraisal = async (req, res) => {
+// View reviewed appraisal
+exports.getReviewedAppraisal = async (req, res) => {
   try {
-    const appraisal = await Appraisal.findOneAndUpdate(
-      {
-        employee: req.user._id,
-        period: req.body.period,
-        year: req.body.year,
-        status: 'draft'
-      },
-      { 
-        status: 'submitted',
-        submittedAt: new Date()
-      },
-      { new: true }
-    ).populate('manager', 'name email');
-    
+    const appraisal = await Appraisal.findOne({
+      _id: req.params.id,
+      employee: req.user._id,
+      status: { $in: ['reviewed-by-manager', 'rejected'] }
+    }).populate({
+      path: 'manager',
+      select: 'name email EmployeeId'
+    });
+
     if (!appraisal) {
-      return res.status(404).json({ message: 'No draft appraisal found to submit' });
+      return res.status(404).json({ 
+        error: 'Appraisal not found or not yet reviewed' 
+      });
     }
-    
-    res.status(200).json(appraisal);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+
+    res.json(appraisal);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };
-
-// Helper function to get available periods
-async function getAvailablePeriods(employeeId) {
-  const currentYear = new Date().getFullYear();
-  const periods = ['Q1', 'Q2', 'Q3', 'Q4', 'Annual'];
-  
-  const existingAppraisals = await Appraisal.find({
-    employee: employeeId,
-    year: currentYear
-  }).select('period');
-  
-  return periods.filter(p => !existingAppraisals.some(a => a.period === p));
-}

@@ -14,7 +14,7 @@ import {
   Select  // Make sure this is included in the import
 } from 'antd';
 import moment from 'moment';
-
+import ManagerLayout from '../../components/Layout/ManagerLayout';
 const ManagerDashboard = () => {
   const [reviews, setReviews] = useState([]);
   const [team, setTeam] = useState([]);
@@ -106,6 +106,7 @@ const ManagerDashboard = () => {
   ];
 
   return (
+    <ManagerLayout>
     <div>
       <h1>Manager Dashboard</h1>
       
@@ -229,6 +230,7 @@ const ManagerDashboard = () => {
         </div>
       ))}
     </div>
+    </ManagerLayout>
   );
 };
 

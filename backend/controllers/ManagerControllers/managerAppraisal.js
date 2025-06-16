@@ -1,77 +1,162 @@
-// In your manager controller (appraisals.js)
 const Appraisal = require('../../models/Appraisal');
+const User = require('../../models/User');
 
-// Get appraisals to review - CORRECTED
-exports.getAppraisalsToReview = async (req, res) => {
+// Helper function to check if manager is authorized for employee
+const isManagerOfEmployee = async (managerId, employeeId) => {
+  const employee = await User.findById(employeeId);
+  return employee && employee.manager && employee.manager.equals(managerId);
+};
+
+// Get all employees under this manager with their details
+exports.getMyTeam = async (req, res) => {
   try {
-    const appraisals = await Appraisal.find({ manager: req.user._id })
-      .populate('employee', 'name email employeeId department')
-      .sort({ submittedAt: -1 }); // Newest first
-    
-    res.status(200).json(appraisals);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    const employees = await User.find({ manager: req.user._id })
+      .select('name email EmployeeId contact role Department createdAt')
+      .sort({ name: 1 });
+
+    res.json(employees);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };
 
-// Submit manager evaluation - CORRECTED
-exports.submitManagerEvaluation = async (req, res) => {
+// Send appraisal form to employee (quarterly/yearly)
+exports.sendAppraisalForm = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { kras, managerFeedback, actionPlan, overallRating } = req.body;
-    
-    const appraisal = await Appraisal.findOneAndUpdate(
-      { 
-        _id: id,
-        manager: req.user._id,
-        status: 'submitted' // Only allow review of submitted appraisals
-      },
-      { 
-        kras: kras.map(kra => ({
-          name: kra.name,
-          kpis: kra.kpis.map(kpi => ({
-            name: kpi.name,
-            target: kpi.target,
-            managerRating: kpi.managerRating
-          })),
-          managerRating: kra.managerRating
-        })),
-        managerFeedback,
-        actionPlan,
-        overallRating,
-        status: 'reviewed',
-        reviewedAt: new Date()
-      },
-      { new: true }
-    ).populate('employee', 'name email'); // Populate employee data
-    
-    if (!appraisal) {
-      return res.status(404).json({ 
-        message: 'Appraisal not found or already reviewed' 
+    const { employeeId, period, year } = req.body;
+
+    // Validate period
+    if (!['Q1', 'Q2', 'Q3', 'Q4', 'Annual'].includes(period)) {
+      return res.status(400).json({ error: 'Invalid period' });
+    }
+
+    // Check if manager is authorized for this employee
+    if (!await isManagerOfEmployee(req.user._id, employeeId)) {
+      return res.status(403).json({ error: 'Not authorized for this employee' });
+    }
+
+    // Check if appraisal already exists for this period
+    const existingAppraisal = await Appraisal.findOne({
+      employee: employeeId,
+      period,
+      year
+    });
+
+    if (existingAppraisal) {
+      return res.status(400).json({ 
+        error: `Appraisal already ${existingAppraisal.status === 'draft' ? 'created' : 'sent'} for this period`,
+        existingAppraisal
       });
     }
-    
-    res.status(200).json(appraisal);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+
+    // Get employee details
+    const employee = await User.findById(employeeId)
+      .select('name email EmployeeId contact role Department');
+
+    if (!employee) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    // Create new appraisal
+    const appraisal = new Appraisal({
+      manager: req.user._id,
+      employee: employeeId,
+      period,
+      year,
+      status: 'sent-to-employee'
+    });
+
+    await appraisal.save();
+
+    // TODO: Send notification to employee
+
+    res.status(201).json({
+      message: `Appraisal form sent successfully for ${period} ${year}`,
+      appraisal
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };
 
-// Get team appraisal overview - CORRECTED
-exports.getTeamOverview = async (req, res) => {
+// Get all appraisals for manager's team
+exports.getTeamAppraisals = async (req, res) => {
   try {
-    const { period, year } = req.query;
-    const filter = { manager: req.user._id };
-    
-    if (period) filter.period = period;
-    if (year) filter.year = year;
-    
-    const appraisals = await Appraisal.find(filter)
-      .populate('employee', 'name department') // Fixed field name
-      .select('period year status overallRating employee');
-    
-    res.status(200).json(appraisals);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    const appraisals = await Appraisal.find({ manager: req.user._id })
+      .populate({
+        path: 'employee',
+        select: 'name email EmployeeId contact role Department'
+      })
+      .sort({ year: -1, period: 1, createdAt: -1 });
+
+    res.json(appraisals);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Review employee submission (approve/reject)
+exports.reviewAppraisal = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { overallRating, feedback, acknowledgement, actionItems, status } = req.body;
+
+    if (!['reviewed-by-manager', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const appraisal = await Appraisal.findOne({
+      _id: id,
+      manager: req.user._id,
+      status: 'submitted-by-employee'
+    });
+
+    if (!appraisal) {
+      return res.status(404).json({ 
+        error: 'Appraisal not found or not in submitted state' 
+      });
+    }
+
+    // Update appraisal with manager's review
+    appraisal.managerReview = {
+      reviewedAt: new Date(),
+      overallRating,
+      feedback,
+      acknowledgement,
+      actionItems: actionItems || []
+    };
+    appraisal.status = status;
+
+    await appraisal.save();
+
+    // TODO: Send notification to employee about review
+
+    res.json({
+      message: `Appraisal ${status === 'reviewed-by-manager' ? 'approved' : 'rejected'}`,
+      appraisal
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Get single appraisal details
+exports.getAppraisalDetails = async (req, res) => {
+  try {
+    const appraisal = await Appraisal.findOne({
+      _id: req.params.id,
+      manager: req.user._id
+    }).populate({
+      path: 'employee',
+      select: 'name email EmployeeId contact role Department'
+    });
+
+    if (!appraisal) {
+      return res.status(404).json({ error: 'Appraisal not found' });
+    }
+
+    res.json(appraisal);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };

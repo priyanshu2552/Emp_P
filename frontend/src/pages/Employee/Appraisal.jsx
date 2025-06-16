@@ -1,864 +1,674 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
-  Container, Typography, Box, Button, Paper,
-  TextField, Rating, Alert, CircularProgress, Card, CardContent,
-  Select, MenuItem, FormControl, InputLabel, Grid, Table, TableBody,
-  TableCell, TableContainer, TableHead, TableRow, Chip
+  Box, Typography, Container, Paper, Tab, Tabs,
+  CircularProgress, Button, Grid, Chip, Divider,
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  TextField, Rating, FormControl, FormLabel,
+  FormGroup, FormControlLabel, Checkbox,
+  Table, TableBody, TableCell, TableContainer,
+  TableHead, TableRow, IconButton, Select,
+  MenuItem, InputLabel, TextareaAutosize, Accordion,
+  AccordionSummary, AccordionDetails
 } from '@mui/material';
+import {
+  Assignment, CheckCircle, HourglassEmpty,
+  Error, Send, Visibility, Edit, Add, Delete,
+  ExpandMore
+} from '@mui/icons-material';
 import axios from 'axios';
-import { Formik, Form, FieldArray } from 'formik';
-import * as Yup from 'yup';
-import dayjs from 'dayjs';
+import { useSnackbar } from 'notistack';
+import { format } from 'date-fns';
 import DashboardLayout from '../../components/Layout/EmployeeLayout';
-const EmployeeDashboard = () => {
+const AppraisalsSection = () => {
+  const [tabValue, setTabValue] = useState(0);
   const [appraisals, setAppraisals] = useState([]);
-  const [currentAppraisal, setCurrentAppraisal] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [periodOptions, setPeriodOptions] = useState([]);
-  const [selectedPeriod, setSelectedPeriod] = useState('');
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [viewMode, setViewMode] = useState('list'); // 'list' or 'detail'
-  const navigate = useNavigate();
+  const [selectedAppraisal, setSelectedAppraisal] = useState(null);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [dialogType, setDialogType] = useState('view');
+  const { enqueueSnackbar } = useSnackbar();
 
-  // Fetch all appraisals and available periods
-  useEffect(() => {
-    const fetchAppraisalData = async () => {
-      try {
-        setLoading(true);
-
-        // Fetch all appraisals for the employee
-        const response = await axios.get('http://localhost:5000/api/employees/appraisals', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        });
-
-        setAppraisals(response.data.appraisals);
-        setPeriodOptions(response.data.periodOptions);
-
-        // Set default to current period if available
-        const currentPeriod = getCurrentPeriod();
-        if (response.data.periodOptions.includes(currentPeriod.period)) {
-          setSelectedPeriod(currentPeriod.period);
-          setSelectedYear(currentPeriod.year);
-        }
-      } catch (err) {
-        setError(err.response?.data?.message || 'Failed to fetch appraisal data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAppraisalData();
-  }, []);
-
-  // Fetch specific appraisal when period/year changes
-  useEffect(() => {
-    if (!selectedPeriod || viewMode === 'list') return;
-
-    const fetchCurrentAppraisal = async () => {
-      try {
-        setLoading(true);
-        const response = await axios.get(
-          `http://localhost:5000/api/employees/appraisal?period=${selectedPeriod}&year=${selectedYear}`,
-          {
-            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-          }
-        );
-        setCurrentAppraisal(response.data);
-      } catch (err) {
-        setError(err.response?.data?.message || 'Failed to fetch appraisal data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCurrentAppraisal();
-  }, [selectedPeriod, selectedYear, viewMode]);
-
-  const getCurrentPeriod = () => {
-    const now = new Date();
-    const month = now.getMonth() + 1;
-    const year = now.getFullYear();
-
-    if (month >= 1 && month <= 3) return { period: 'Q1', year };
-    if (month >= 4 && month <= 6) return { period: 'Q2', year };
-    if (month >= 7 && month <= 9) return { period: 'Q3', year };
-    if (month >= 10 && month <= 12) return { period: 'Q4', year };
-    return { period: 'Annual', year };
-  };
-
-  const initialValues = currentAppraisal || {
-    period: selectedPeriod || getCurrentPeriod().period,
-    year: selectedYear || getCurrentPeriod().year,
-    kras: [
-      {
-        name: 'Code Quality',
-        selfRating: null,
-        achievements: '',
-        areasToImprove: '',
-        kpis: [
-          { name: 'Code review pass rate', target: '90%+', selfRating: null },
-          { name: 'Defect leakage', target: '<5%', selfRating: null },
-          { name: 'Coding standards', target: '100% adherence', selfRating: null }
-        ]
-      },
-      {
-        name: 'On-Time Delivery',
-        selfRating: null,
-        achievements: '',
-        areasToImprove: '',
-        kpis: [
-          { name: 'Sprint completion', target: '95%', selfRating: null },
-          { name: 'Scope creep', target: '<10%', selfRating: null }
-        ]
-      }
-    ],
+  // Form states
+  const [formData, setFormData] = useState({
+    workItems: [{ description: '', completionStatus: 'not-started', codeQualityRating: 3 }],
+    goals: [{ description: '', achieved: false, rating: 3 }],
+    keyResults: [{ description: '', deliveredOnTime: true, qualityRating: 3 }],
     additionalComments: '',
-    careerGoals: ''
-  };
-
-  const validationSchema = Yup.object().shape({
-    kras: Yup.array().of(
-      Yup.object().shape({
-        selfRating: Yup.number()
-          .min(1, 'Rating must be at least 1')
-          .max(5, 'Rating must be at most 5')
-          .required('Rating is required'),
-        achievements: Yup.string().required('Achievements are required'),
-        areasToImprove: Yup.string().required('Areas to improve are required'),
-        kpis: Yup.array().of(
-          Yup.object().shape({
-            selfRating: Yup.number()
-              .min(1, 'Rating must be at least 1')
-              .max(5, 'Rating must be at most 5')
-              .required('Rating is required')
-          })
-        )
-      })
-    ),
-    additionalComments: Yup.string(),
-    careerGoals: Yup.string()
+    selfRating: 3,
+    finalComments: ''
   });
 
-  const handleSaveDraft = async (values, { setSubmitting }) => {
-    try {
-      const { data } = await axios.put(
-        'http://localhost:5000/api/employees/appraisal',
-        values,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        }
-      );
-
-      setCurrentAppraisal(data);
-      setSuccess('Draft saved successfully');
-      setError('');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save draft');
-    } finally {
-      setSubmitting(false);
-    }
+  const statusColors = {
+    'draft': 'default',
+    'sent-to-employee': 'info',
+    'submitted-by-employee': 'primary',
+    'reviewed-by-manager': 'success',
+    'rejected': 'error'
   };
 
-  const handleSubmitAppraisal = async (values) => {
+  useEffect(() => {
+    fetchAppraisals();
+  }, []); const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
+
+
+
+  const fetchAppraisals = async () => {
     try {
-      const { data } = await axios.post(
-        'http://localhost:5000/api/employees/appraisal/submit',
-        values,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        }
-      );
-
-      // Update the appraisals list with the newly submitted appraisal
-      setAppraisals(prev => {
-        const existingIndex = prev.findIndex(a =>
-          a._id === data._id ||
-          (a.period === data.period && a.year === data.year)
-        );
-
-        if (existingIndex >= 0) {
-          const updated = [...prev];
-          updated[existingIndex] = data;
-          return updated;
-        }
-        return [...prev, data];
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get('http://localhost:5000/api/employees/appraisals', {
+        headers: { Authorization: `Bearer ${token}` }
       });
-
-      setSuccess('Appraisal submitted successfully');
-      setError('');
-      setViewMode('list'); // Switch to list view after submission
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to submit appraisal');
+      setAppraisals(response.data);
+      setLoading(false);
+    } catch (error) {
+      enqueueSnackbar('Failed to fetch appraisals', { variant: 'error' });
+      setLoading(false);
     }
   };
 
-  const handlePeriodChange = (event) => {
-    setSelectedPeriod(event.target.value);
+  const handleViewAppraisal = (appraisal, type = 'view') => {
+    setSelectedAppraisal(appraisal);
+
+    // Only allow editing if status is 'sent-to-employee'
+    if (type === 'edit' && appraisal.status === 'sent-to-employee') {
+      setDialogType('edit');
+      setFormData({
+        workItems: appraisal.workItems || [],
+        goals: appraisal.goals || [],
+        keyResults: appraisal.keyResults || [],
+        additionalComments: appraisal.additionalComments || '',
+        selfRating: appraisal.employeeSubmission?.selfRating || 3,
+        finalComments: appraisal.employeeSubmission?.finalComments || ''
+      });
+    } else {
+      setDialogType('view');
+    }
+
+    setOpenDialog(true);
   };
 
-  const handleYearChange = (event) => {
-    setSelectedYear(event.target.value);
-  };
-
-  const handleViewAppraisal = (appraisal) => {
-    setCurrentAppraisal(appraisal);
-    setSelectedPeriod(appraisal.period);
-    setSelectedYear(appraisal.year);
-    setViewMode('detail');
-  };
-
-  const handleCreateNew = () => {
-    setCurrentAppraisal(null);
-    setViewMode('detail');
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'draft': return 'default';
-      case 'submitted': return 'info';
-      case 'reviewed': return 'success';
-      case 'rejected': return 'warning';
-      default: return 'default';
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(
+        `http://localhost:5000/api/employees/appraisals/${selectedAppraisal._id}/submit`,
+        formData,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      enqueueSnackbar('Appraisal submitted successfully', { variant: 'success' });
+      fetchAppraisals();
+      setOpenDialog(false);
+    } catch (error) {
+      enqueueSnackbar(error.response?.data?.error || 'Submission failed', { variant: 'error' });
     }
   };
 
-  if (loading) {
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleArrayItemChange = (arrayName, index, field, value) => {
+    setFormData(prev => {
+      const newArray = [...prev[arrayName]];
+      newArray[index][field] = value;
+      return { ...prev, [arrayName]: newArray };
+    });
+  };
+
+  const addArrayItem = (arrayName, template) => {
+    setFormData(prev => ({
+      ...prev,
+      [arrayName]: [...prev[arrayName], template]
+    }));
+  };
+
+  const removeArrayItem = (arrayName, index) => {
+    setFormData(prev => ({
+      ...prev,
+      [arrayName]: prev[arrayName].filter((_, i) => i !== index)
+    }));
+  };
+
+  const renderWorkItems = () => (
+
+    <TableContainer component={Paper} sx={{ mb: 3 }}>
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell>Description</TableCell>
+            <TableCell>Status</TableCell>
+            <TableCell>Quality Rating</TableCell>
+            <TableCell>Actions</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {formData.workItems.map((item, index) => (
+            <TableRow key={index}>
+              <TableCell>
+                <TextField
+                  fullWidth
+                  multiline
+                  value={item.description}
+                  onChange={(e) => handleArrayItemChange('workItems', index, 'description', e.target.value)}
+                />
+              </TableCell>
+              <TableCell>
+                <Select
+                  value={item.completionStatus}
+                  onChange={(e) => handleArrayItemChange('workItems', index, 'completionStatus', e.target.value)}
+                >
+                  <MenuItem value="completed">Completed</MenuItem>
+                  <MenuItem value="in-progress">In Progress</MenuItem>
+                  <MenuItem value="not-started">Not Started</MenuItem>
+                  <MenuItem value="delayed">Delayed</MenuItem>
+                </Select>
+              </TableCell>
+              <TableCell>
+                <Rating
+                  value={item.codeQualityRating}
+                  onChange={(_, newValue) => handleArrayItemChange('workItems', index, 'codeQualityRating', newValue)}
+                />
+              </TableCell>
+              <TableCell>
+                <IconButton onClick={() => removeArrayItem('workItems', index)}>
+                  <Delete color="error" />
+                </IconButton>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      <Button
+        startIcon={<Add />}
+        onClick={() => addArrayItem('workItems', {
+          description: '',
+          completionStatus: 'not-started',
+          codeQualityRating: 3
+        })}
+        sx={{ mt: 1 }}
+      >
+        Add Work Item
+      </Button>
+    </TableContainer>
+  );
+
+  const renderGoals = () => (
+    <TableContainer component={Paper} sx={{ mb: 3 }}>
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell>Description</TableCell>
+            <TableCell>Achieved</TableCell>
+            <TableCell>Rating</TableCell>
+            <TableCell>Actions</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {formData.goals.map((item, index) => (
+            <TableRow key={index}>
+              <TableCell>
+                <TextField
+                  fullWidth
+                  multiline
+                  value={item.description}
+                  onChange={(e) => handleArrayItemChange('goals', index, 'description', e.target.value)}
+                />
+              </TableCell>
+              <TableCell>
+                <Checkbox
+                  checked={item.achieved}
+                  onChange={(e) => handleArrayItemChange('goals', index, 'achieved', e.target.checked)}
+                />
+              </TableCell>
+              <TableCell>
+                <Rating
+                  value={item.rating}
+                  onChange={(_, newValue) => handleArrayItemChange('goals', index, 'rating', newValue)}
+                />
+              </TableCell>
+              <TableCell>
+                <IconButton onClick={() => removeArrayItem('goals', index)}>
+                  <Delete color="error" />
+                </IconButton>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      <Button
+        startIcon={<Add />}
+        onClick={() => addArrayItem('goals', {
+          description: '',
+          achieved: false,
+          rating: 3
+        })}
+        sx={{ mt: 1 }}
+      >
+        Add Goal
+      </Button>
+    </TableContainer>
+  );
+
+  const renderKeyResults = () => (
+    <TableContainer component={Paper} sx={{ mb: 3 }}>
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell>Description</TableCell>
+            <TableCell>Delivered On Time</TableCell>
+            <TableCell>Quality Rating</TableCell>
+            <TableCell>Actions</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {formData.keyResults.map((item, index) => (
+            <TableRow key={index}>
+              <TableCell>
+                <TextField
+                  fullWidth
+                  multiline
+                  value={item.description}
+                  onChange={(e) => handleArrayItemChange('keyResults', index, 'description', e.target.value)}
+                />
+              </TableCell>
+              <TableCell>
+                <Checkbox
+                  checked={item.deliveredOnTime}
+                  onChange={(e) => handleArrayItemChange('keyResults', index, 'deliveredOnTime', e.target.checked)}
+                />
+              </TableCell>
+              <TableCell>
+                <Rating
+                  value={item.qualityRating}
+                  onChange={(_, newValue) => handleArrayItemChange('keyResults', index, 'qualityRating', newValue)}
+                />
+              </TableCell>
+              <TableCell>
+                <IconButton onClick={() => removeArrayItem('keyResults', index)}>
+                  <Delete color="error" />
+                </IconButton>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      <Button
+        startIcon={<Add />}
+        onClick={() => addArrayItem('keyResults', {
+          description: '',
+          deliveredOnTime: true,
+          qualityRating: 3
+        })}
+        sx={{ mt: 1 }}
+      >
+        Add Key Result
+      </Button>
+    </TableContainer>
+  );
+
+  const renderAppraisalForm = () => (
+    <form onSubmit={handleFormSubmit}>
+      <Typography variant="h6" gutterBottom>Work Items</Typography>
+      {renderWorkItems()}
+
+      <Typography variant="h6" gutterBottom>Goals</Typography>
+      {renderGoals()}
+
+      <Typography variant="h6" gutterBottom>Key Results</Typography>
+      {renderKeyResults()}
+
+      <TextField
+        fullWidth
+        multiline
+        rows={4}
+        label="Additional Comments"
+        name="additionalComments"
+        value={formData.additionalComments}
+        onChange={handleInputChange}
+        sx={{ mb: 3 }}
+      />
+
+      <FormControl component="fieldset" fullWidth sx={{ mb: 3 }}>
+        <FormLabel component="legend">Self Rating</FormLabel>
+        <Rating
+          name="selfRating"
+          value={formData.selfRating}
+          onChange={(_, newValue) => handleInputChange({ target: { name: 'selfRating', value: newValue } })}
+          size="large"
+        />
+      </FormControl>
+
+      <TextField
+        fullWidth
+        multiline
+        rows={4}
+        label="Final Comments"
+        name="finalComments"
+        value={formData.finalComments}
+        onChange={handleInputChange}
+        sx={{ mb: 3 }}
+      />
+
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+        <Button
+          variant="contained"
+          color="primary"
+          type="submit"
+          startIcon={<Send />}
+        >
+          Submit Appraisal
+        </Button>
+      </Box>
+    </form>
+  );
+
+  const renderAppraisalDetails = () => {
+    if (!selectedAppraisal) return null;
+
     return (
-      <Container maxWidth="md" sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
-        <CircularProgress />
-      </Container>
-    );
-  }
+      <DashboardLayout>
+      <Box>
+        <Typography variant="h6" gutterBottom>
+          {selectedAppraisal.period} {selectedAppraisal.year} Appraisal
+        </Typography>
+        <Chip
+          label={selectedAppraisal.status.replace(/-/g, ' ')}
+          color={statusColors[selectedAppraisal.status]}
+          sx={{ mb: 2 }}
+        />
 
-  // Appraisal List View
-  if (viewMode === 'list') {
-   
-    return (
-       <DashboardLayout>
-      <Container maxWidth="md" sx={{ mt: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4">My Appraisals</Typography>
-          <Button
-            variant="contained"
-            onClick={handleCreateNew}
-            disabled={!periodOptions.length}
-          >
-            Create New Appraisal
-          </Button>
-        </Box>
-
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-        {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
-
-        {appraisals.length === 0 ? (
-          <Paper sx={{ p: 3, textAlign: 'center' }}>
-            <Typography variant="h6" gutterBottom>
-              No appraisals found
-            </Typography>
-            <Typography sx={{ mb: 2 }}>
-              You haven't created any appraisals yet. Start by creating a new one.
-            </Typography>
-            <Button
-              variant="contained"
-              onClick={handleCreateNew}
-              disabled={!periodOptions.length}
-            >
-              Create New Appraisal
-            </Button>
-          </Paper>
-        ) : (
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Period</TableCell>
-                  <TableCell>Year</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Overall Rating</TableCell>
-                  <TableCell>Submitted</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {appraisals.map((appraisal) => (
-                  <TableRow key={appraisal._id}>
-                    <TableCell>{appraisal.period}</TableCell>
-                    <TableCell>{appraisal.year}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={appraisal.status}
-                        color={getStatusColor(appraisal.status)}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {appraisal.overallRating ? (
-                        <Rating value={appraisal.overallRating} precision={0.5} readOnly />
-                      ) : (
-                        'N/A'
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {appraisal.submittedAt ?
-                        dayjs(appraisal.submittedAt).format('MMM D, YYYY') :
-                        'Not submitted'}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        size="small"
-                        onClick={() => handleViewAppraisal(appraisal)}
-                      >
-                        View
-                      </Button>
-                    </TableCell>
+        <Accordion defaultExpanded>
+          <AccordionSummary expandIcon={<ExpandMore />}>
+            <Typography>Work Items</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Description</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Quality</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                </TableHead>
+                <TableBody>
+                  {selectedAppraisal.workItems?.map((item, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{item.description}</TableCell>
+                      <TableCell>{item.completionStatus}</TableCell>
+                      <TableCell>
+                        <Rating value={item.codeQualityRating} readOnly />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </AccordionDetails>
+        </Accordion>
+
+        <Accordion>
+          <AccordionSummary expandIcon={<ExpandMore />}>
+            <Typography>Goals</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Description</TableCell>
+                    <TableCell>Achieved</TableCell>
+                    <TableCell>Rating</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {selectedAppraisal.goals?.map((item, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{item.description}</TableCell>
+                      <TableCell>
+                        {item.achieved ? <CheckCircle color="success" /> : <Error color="error" />}
+                      </TableCell>
+                      <TableCell>
+                        <Rating value={item.rating} readOnly />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </AccordionDetails>
+        </Accordion>
+
+        <Accordion>
+          <AccordionSummary expandIcon={<ExpandMore />}>
+            <Typography>Key Results</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Description</TableCell>
+                    <TableCell>On Time</TableCell>
+                    <TableCell>Quality</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {selectedAppraisal.keyResults?.map((item, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{item.description}</TableCell>
+                      <TableCell>
+                        {item.deliveredOnTime ? <CheckCircle color="success" /> : <Error color="error" />}
+                      </TableCell>
+                      <TableCell>
+                        <Rating value={item.qualityRating} readOnly />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </AccordionDetails>
+        </Accordion>
+
+        {selectedAppraisal.additionalComments && (
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="subtitle1">Additional Comments</Typography>
+            <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
+              {selectedAppraisal.additionalComments}
+            </Typography>
+          </Box>
         )}
-      </Container>
+
+        {selectedAppraisal.employeeSubmission && (
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="h6">Employee Submission</Typography>
+            <Typography variant="body2">
+              Submitted on: {format(new Date(selectedAppraisal.employeeSubmission.submittedAt), 'PPpp')}
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+              <Typography variant="subtitle1" sx={{ mr: 1 }}>Self Rating:</Typography>
+              <Rating value={selectedAppraisal.employeeSubmission.selfRating} readOnly />
+            </Box>
+            {selectedAppraisal.employeeSubmission.finalComments && (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="subtitle1">Final Comments</Typography>
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
+                  {selectedAppraisal.employeeSubmission.finalComments}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {selectedAppraisal.managerReview && (
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="h6">Manager Review</Typography>
+            <Typography variant="body2">
+              Reviewed on: {format(new Date(selectedAppraisal.managerReview.reviewedAt), 'PPpp')}
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+              <Typography variant="subtitle1" sx={{ mr: 1 }}>Overall Rating:</Typography>
+              <Rating value={selectedAppraisal.managerReview.overallRating} readOnly />
+            </Box>
+            {selectedAppraisal.managerReview.feedback && (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="subtitle1">Feedback</Typography>
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
+                  {selectedAppraisal.managerReview.feedback}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        )}
+      </Box>
       </DashboardLayout>
     );
-  }
+  };
 
-  // Appraisal Detail View (Edit or Read-only)
+  const renderAppraisalCard = (appraisal) => (
+    <Paper sx={{ p: 2, mb: 2 }} key={appraisal._id}>
+      <Grid container alignItems="center" spacing={2}>
+        <Grid item xs={12} md={3}>
+          <Typography variant="h6">
+            {appraisal.period} {appraisal.year}
+          </Typography>
+          <Chip
+            label={appraisal.status.replace(/-/g, ' ')}
+            color={statusColors[appraisal.status]}
+            size="small"
+          />
+        </Grid>
+        <Grid item xs={12} md={3}>
+          <Typography variant="body2">
+            Created: {format(new Date(appraisal.createdAt), 'PP')}
+          </Typography>
+        </Grid>
+        <Grid item xs={12} md={3}>
+          <Typography variant="body2">
+            Manager: {appraisal.manager?.name || 'N/A'}
+          </Typography>
+        </Grid>
+        <Grid item xs={12} md={3} sx={{ textAlign: 'right' }}>
+          {appraisal.status === 'sent-to-employee' && (
+            <Button
+              variant="contained"
+              startIcon={<Edit />}
+              onClick={() => handleViewAppraisal(appraisal, 'edit')}
+              sx={{ mr: 1 }}
+            >
+              Complete
+            </Button>
+          )}
+          {/* Always show View button regardless of status */}
+          <Button
+            variant="outlined"
+            startIcon={<Visibility />}
+            onClick={() => handleViewAppraisal(appraisal)}
+          >
+            View
+          </Button>
+        </Grid>
+      </Grid>
+    </Paper>
+  );
   return (
     <DashboardLayout>
-    <Container maxWidth="md" sx={{ mt: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">
-          {currentAppraisal ?
-            `Appraisal - ${currentAppraisal.period} ${currentAppraisal.year}` :
-            'Create New Appraisal'}
-        </Typography>
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        Performance Appraisals
+      </Typography>
 
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Period</InputLabel>
-            <Select
-              value={selectedPeriod}
-              label="Period"
-              onChange={handlePeriodChange}
-              disabled={currentAppraisal?.status !== 'draft'}
-            >
-              {periodOptions.map((period) => (
-                <MenuItem key={period} value={period}>{period}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+      <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 3 }}>
+        <Tab label="Current Appraisals" />
+        <Tab label="Past Appraisals" />
+      </Tabs>
 
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Year</InputLabel>
-            <Select
-              value={selectedYear}
-              label="Year"
-              onChange={handleYearChange}
-              disabled={currentAppraisal?.status !== 'draft'}
-            >
-              {[selectedYear - 1, selectedYear, selectedYear + 1].map((year) => (
-                <MenuItem key={year} value={year}>{year}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <CircularProgress />
         </Box>
-      </Box>
-
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
-
-      {currentAppraisal?.status === 'reviewed' && (
-        <Card sx={{ mb: 3, backgroundColor: '#f5f5f5' }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-              Manager Evaluation
-            </Typography>
-
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="subtitle1">Overall Rating</Typography>
-              <Rating value={currentAppraisal.overallRating} precision={0.5} readOnly />
-              <Typography>({currentAppraisal.overallRating}/5)</Typography>
-            </Box>
-
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="subtitle1">Feedback</Typography>
-              <Typography sx={{ whiteSpace: 'pre-line' }}>{currentAppraisal.managerFeedback}</Typography>
-            </Box>
-
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="subtitle1">Action Plan</Typography>
-              <Typography sx={{ whiteSpace: 'pre-line' }}>{currentAppraisal.actionPlan}</Typography>
-            </Box>
-
-            <Typography variant="caption" color="text.secondary">
-              Reviewed on: {dayjs(currentAppraisal.reviewedAt).format('MMMM D, YYYY')}
-            </Typography>
-          </CardContent>
-        </Card>
-      )}
-      {currentAppraisal?.status !== 'draft' ? (
-        // Read-only view for submitted/reviewed appraisals
-        <Formik
-          initialValues={initialValues}
-          validationSchema={validationSchema}
-          onSubmit={handleSaveDraft}
-          enableReinitialize
-        >
-          {({ values }) => (
-            <Form>
-              <FieldArray name="kras">
-                {() => (
-                  <Box>
-                    {values.kras.map((kra, kraIndex) => (
-                      <Paper key={kraIndex} sx={{ p: 3, mb: 3 }}>
-                        <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-                          {kra.name}
-                        </Typography>
-
-                        <Grid container spacing={2}>
-                          {/* Self Evaluation Column */}
-                          <Grid item xs={12} md={6}>
-                            <Box sx={{
-                              p: 2,
-                              backgroundColor: '#f0f7ff',
-                              borderRadius: 1,
-                              height: '100%'
-                            }}>
-                              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
-                                Your Self Evaluation
-                              </Typography>
-
-                              <Box sx={{ mb: 2 }}>
-                                <Typography variant="subtitle2">Self Rating</Typography>
-                                <Rating
-                                  value={Number(kra.selfRating)}
-                                  precision={1}
-                                  readOnly
-                                />
-                              </Box>
-
-                              <Box sx={{ mb: 2 }}>
-                                <Typography variant="subtitle2">Achievements</Typography>
-                                <Typography sx={{ whiteSpace: 'pre-line' }}>
-                                  {kra.achievements || 'Not provided'}
-                                </Typography>
-                              </Box>
-
-                              <Box sx={{ mb: 2 }}>
-                                <Typography variant="subtitle2">Areas to Improve</Typography>
-                                <Typography sx={{ whiteSpace: 'pre-line' }}>
-                                  {kra.areasToImprove || 'Not provided'}
-                                </Typography>
-                              </Box>
-
-                              <Typography variant="subtitle2" sx={{ mt: 2, fontWeight: 'bold' }}>
-                                Your KPI Ratings
-                              </Typography>
-                              {kra.kpis.map((kpi, kpiIndex) => (
-                                <Box
-                                  key={kpiIndex}
-                                  sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    mb: 1,
-                                    p: 1,
-                                    backgroundColor: '#e1f0ff',
-                                    borderRadius: 1
-                                  }}
-                                >
-                                  <Box sx={{ flex: 1 }}>
-                                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                                      {kpi.name}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      Target: {kpi.target}
-                                    </Typography>
-                                  </Box>
-                                  <Rating
-                                    value={Number(kpi.selfRating)}
-                                    precision={1}
-                                    readOnly
-                                  />
-                                </Box>
-                              ))}
-                            </Box>
-                          </Grid>
-
-                          {/* Manager Feedback Column - Only show if appraisal is reviewed */}
-                          {currentAppraisal?.status === 'reviewed' && (
-                            <Grid item xs={12} md={6}>
-                              <Box sx={{
-                                p: 2,
-                                backgroundColor: '#fff5f5',
-                                borderRadius: 1,
-                                height: '100%'
-                              }}>
-                                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
-                                  Manager's Evaluation
-                                </Typography>
-
-                                {currentAppraisal.kras[kraIndex]?.managerRating && (
-                                  <Box sx={{ mb: 2 }}>
-                                    <Typography variant="subtitle2">Manager Rating</Typography>
-                                    <Rating
-                                      value={Number(currentAppraisal.kras[kraIndex].managerRating)}
-                                      precision={1}
-                                      readOnly
-                                    />
-                                  </Box>
-                                )}
-
-                                {currentAppraisal.kras[kraIndex]?.managerComments && (
-                                  <Box sx={{ mb: 2 }}>
-                                    <Typography variant="subtitle2">Manager Comments</Typography>
-                                    <Typography sx={{ whiteSpace: 'pre-line' }}>
-                                      {currentAppraisal.kras[kraIndex].managerComments || 'No comments provided'}
-                                    </Typography>
-                                  </Box>
-                                )}
-
-                                {currentAppraisal.kras[kraIndex]?.kpis && (
-                                  <>
-                                    <Typography variant="subtitle2" sx={{ mt: 2, fontWeight: 'bold' }}>
-                                      Manager's KPI Ratings
-                                    </Typography>
-                                    {currentAppraisal.kras[kraIndex].kpis.map((kpi, kpiIndex) => (
-                                      <Box
-                                        key={kpiIndex}
-                                        sx={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          mb: 1,
-                                          p: 1,
-                                          backgroundColor: '#ffeaea',
-                                          borderRadius: 1
-                                        }}
-                                      >
-                                        <Box sx={{ flex: 1 }}>
-                                          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                                            {kpi.name}
-                                          </Typography>
-                                          <Typography variant="caption" color="text.secondary">
-                                            Target: {kpi.target}
-                                          </Typography>
-                                        </Box>
-                                        <Rating
-                                          value={Number(kpi.managerRating)}
-                                          precision={1}
-                                          readOnly
-                                        />
-                                      </Box>
-                                    ))}
-                                  </>
-                                )}
-                              </Box>
-                            </Grid>
-                          )}
-                        </Grid>
-                      </Paper>
-                    ))}
-                  </Box>
-                )}
-              </FieldArray>
-
-              <Grid container spacing={2}>
-                {/* Self Evaluation Column */}
-                <Grid item xs={12} md={currentAppraisal?.status === 'reviewed' ? 6 : 12}>
-                  <Paper sx={{ p: 3, mb: 3, backgroundColor: '#f0f7ff' }}>
-                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-                      Your Additional Comments
-                    </Typography>
-                    <Typography sx={{ whiteSpace: 'pre-line' }}>
-                      {values.additionalComments || 'No comments provided'}
-                    </Typography>
-                  </Paper>
-
-                  <Paper sx={{ p: 3, mb: 3, backgroundColor: '#f0f7ff' }}>
-                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-                      Your Career Goals
-                    </Typography>
-                    <Typography sx={{ whiteSpace: 'pre-line' }}>
-                      {values.careerGoals || 'No goals provided'}
-                    </Typography>
-                  </Paper>
-                </Grid>
-
-                {/* Manager Feedback Column - Only show if appraisal is reviewed */}
-                {currentAppraisal?.status === 'reviewed' && (
-                  <Grid item xs={12} md={6}>
-                    {currentAppraisal.managerFeedback && (
-                      <Paper sx={{ p: 3, mb: 3, backgroundColor: '#fff5f5' }}>
-                        <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-                          Manager's Overall Feedback
-                        </Typography>
-                        <Typography sx={{ whiteSpace: 'pre-line' }}>
-                          {currentAppraisal.managerFeedback}
-                        </Typography>
-                      </Paper>
-                    )}
-
-                    {currentAppraisal.actionPlan && (
-                      <Paper sx={{ p: 3, mb: 3, backgroundColor: '#fff5f5' }}>
-                        <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-                          Manager's Action Plan
-                        </Typography>
-                        <Typography sx={{ whiteSpace: 'pre-line' }}>
-                          {currentAppraisal.actionPlan}
-                        </Typography>
-                      </Paper>
-                    )}
-
-                    <Paper sx={{ p: 3, mb: 3, backgroundColor: '#fff5f5' }}>
-                      <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-                        Overall Rating
-                      </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Rating
-                          value={currentAppraisal.overallRating}
-                          precision={0.5}
-                          readOnly
-                        />
-                        <Typography>({currentAppraisal.overallRating}/5)</Typography>
-                      </Box>
-                    </Paper>
-                  </Grid>
-                )}
-              </Grid>
-
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
-                <Button
-                  variant="outlined"
-                  onClick={() => setViewMode('list')}
-                >
-                  Back to List
-                </Button>
-              </Box>
-            </Form>
-          )}
-        </Formik>
       ) : (
-        // Edit mode for draft appraisals
-        <Formik
-          initialValues={initialValues}
-          validationSchema={validationSchema}
-          onSubmit={handleSaveDraft}
-          enableReinitialize
-        >
-          {({
-            values,
-            errors,
-            touched,
-            handleChange,
-            handleBlur,
-            isSubmitting,
-            submitForm,
-            setSubmitting,
-            isValid
-          }) => (
-            <Form>
-              <FieldArray name="kras">
-                {() => (
-                  <Box>
-                    {values.kras.map((kra, kraIndex) => (
-                      <Paper key={kraIndex} sx={{ p: 3, mb: 3 }}>
-                        <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-                          {kra.name}
-                        </Typography>
-
-                        <Grid container spacing={2}>
-                          <Grid item xs={12} md={6}>
-                            <Box sx={{ mb: 2 }}>
-                              <Typography variant="subtitle1">Self Rating</Typography>
-                              <Rating
-                                name={`kras[${kraIndex}].selfRating`}
-                                value={Number(values.kras[kraIndex].selfRating)}
-                                onChange={(e, newValue) => {
-                                  handleChange({
-                                    target: {
-                                      name: `kras[${kraIndex}].selfRating`,
-                                      value: newValue
-                                    }
-                                  });
-                                }}
-                                precision={1}
-                              />
-                              {errors.kras?.[kraIndex]?.selfRating && touched.kras?.[kraIndex]?.selfRating && (
-                                <Typography color="error" variant="caption">
-                                  {errors.kras[kraIndex].selfRating}
-                                </Typography>
-                              )}
-                            </Box>
-                          </Grid>
-
-                          <Grid item xs={12}>
-                            <Box sx={{ mb: 2 }}>
-                              <Typography variant="subtitle1">Achievements</Typography>
-                              <TextField
-                                name={`kras[${kraIndex}].achievements`}
-                                value={values.kras[kraIndex].achievements}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                                fullWidth
-                                multiline
-                                rows={3}
-                                error={Boolean(errors.kras?.[kraIndex]?.achievements && touched.kras?.[kraIndex]?.achievements)}
-                                helperText={
-                                  errors.kras?.[kraIndex]?.achievements && touched.kras?.[kraIndex]?.achievements
-                                    ? errors.kras[kraIndex].achievements
-                                    : 'Describe your key achievements in this area'
-                                }
-                              />
-                            </Box>
-                          </Grid>
-
-                          <Grid item xs={12}>
-                            <Box sx={{ mb: 2 }}>
-                              <Typography variant="subtitle1">Areas to Improve</Typography>
-                              <TextField
-                                name={`kras[${kraIndex}].areasToImprove`}
-                                value={values.kras[kraIndex].areasToImprove}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                                fullWidth
-                                multiline
-                                rows={3}
-                                error={Boolean(errors.kras?.[kraIndex]?.areasToImprove && touched.kras?.[kraIndex]?.areasToImprove)}
-                                helperText={
-                                  errors.kras?.[kraIndex]?.areasToImprove && touched.kras?.[kraIndex]?.areasToImprove
-                                    ? errors.kras[kraIndex].areasToImprove
-                                    : 'Identify areas where you can improve'
-                                }
-                              />
-                            </Box>
-                          </Grid>
-                        </Grid>
-
-                        <Typography variant="subtitle1" sx={{ mt: 2, fontWeight: 'bold' }}>
-                          KPIs
-                        </Typography>
-
-                        {kra.kpis.map((kpi, kpiIndex) => (
-                          <Box
-                            key={kpiIndex}
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              mb: 1,
-                              p: 1,
-                              backgroundColor: '#f9f9f9',
-                              borderRadius: 1
-                            }}
-                          >
-                            <Box sx={{ flex: 1 }}>
-                              <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
-                                {kpi.name}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                Target: {kpi.target}
-                              </Typography>
-                            </Box>
-                            <Rating
-                              name={`kras[${kraIndex}].kpis[${kpiIndex}].selfRating`}
-                              value={Number(values.kras[kraIndex].kpis[kpiIndex].selfRating)}
-                              onChange={(e, newValue) => {
-                                handleChange({
-                                  target: {
-                                    name: `kras[${kraIndex}].kpis[${kpiIndex}].selfRating`,
-                                    value: newValue
-                                  }
-                                });
-                              }}
-                              precision={1}
-                            />
-                            {errors.kras?.[kraIndex]?.kpis?.[kpiIndex]?.selfRating && (
-                              <Typography color="error" variant="caption" sx={{ ml: 1 }}>
-                                Required
-                              </Typography>
-                            )}
-                          </Box>
-                        ))}
-                      </Paper>
-                    ))}
-                  </Box>
-                )}
-              </FieldArray>
-
-              <Paper sx={{ p: 3, mb: 3 }}>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-                  Additional Comments
+        <Box>
+          {tabValue === 0 ? (
+            <Box>
+              <Typography variant="h6" gutterBottom>
+                Active Appraisals
+              </Typography>
+              {appraisals.filter(a => ['sent-to-employee', 'submitted-by-employee'].includes(a.status)).length > 0 ? (
+                appraisals
+                  .filter(a => ['sent-to-employee', 'submitted-by-employee'].includes(a.status))
+                  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                  .map(renderAppraisalCard)
+              ) : (
+                <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
+                  No active appraisals at this time.
                 </Typography>
-                <TextField
-                  name="additionalComments"
-                  value={values.additionalComments}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  fullWidth
-                  multiline
-                  rows={3}
-                  placeholder="Any additional comments about your performance..."
-                />
-              </Paper>
-
-              <Paper sx={{ p: 3, mb: 3 }}>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-                  Career Goals
+              )}
+            </Box>
+          ) : (
+            <Box>
+              <Typography variant="h6" gutterBottom>
+                Appraisal History
+              </Typography>
+              {appraisals.filter(a => !['sent-to-employee', 'submitted-by-employee'].includes(a.status)).length > 0 ? (
+                appraisals
+                  .filter(a => !['sent-to-employee', 'submitted-by-employee'].includes(a.status))
+                  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                  .map(renderAppraisalCard)
+              ) : (
+                <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
+                  No past appraisals found.
                 </Typography>
-                <TextField
-                  name="careerGoals"
-                  value={values.careerGoals}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  fullWidth
-                  multiline
-                  rows={3}
-                  placeholder="Describe your short-term and long-term career goals..."
-                />
-              </Paper>
-
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
-                <Box>
-                  <Button
-                    variant="outlined"
-                    onClick={() => setViewMode('list')}
-                    sx={{ mr: 2 }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    type="submit"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? <CircularProgress size={24} /> : 'Save Draft'}
-                  </Button>
-                </Box>
-
-                <Button
-                  variant="contained"
-                  color="success"
-                  type="button"
-                  onClick={async () => {
-                    await submitForm();
-                    if (isValid) {
-                      handleSubmitAppraisal(values);
-                    }
-                  }}
-                  disabled={isSubmitting || !isValid}
-                >
-                  Submit for Review
-                </Button>
-              </Box>
-            </Form>
+              )}
+            </Box>
           )}
-        </Formik>
+        </Box>
       )}
-        </Container>
+
+      <Dialog
+        open={openDialog}
+        onClose={() => setOpenDialog(false)}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogTitle>
+          {selectedAppraisal?.period} {selectedAppraisal?.year} Appraisal
+          <Chip
+            label={selectedAppraisal?.status.replace(/-/g, ' ')}
+            color={statusColors[selectedAppraisal?.status]}
+            sx={{ ml: 2 }}
+          />
+        </DialogTitle>
+        <DialogContent dividers>
+          {dialogType === 'edit' ? (
+            renderAppraisalForm()
+          ) : (
+            renderAppraisalDetails()
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDialog(false)}>Close</Button>
+          {dialogType === 'edit' && (
+            <Button
+              variant="contained"
+              onClick={handleFormSubmit}
+              startIcon={<Send />}
+            >
+              Submit
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
+    </Container>
     </DashboardLayout>
   );
 };
 
-export default EmployeeDashboard;
+export default AppraisalsSection;

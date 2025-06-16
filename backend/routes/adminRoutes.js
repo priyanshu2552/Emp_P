@@ -8,11 +8,7 @@ const { protect, authorize } = require('../middlewares/authMiddleware');
 const { GridFsStorage } = require('multer-gridfs-storage');
 
 // Controllers
-const {
-  getAllAppraisals,
-  createAppraisalCycle,
-  getAppraisalStats
-} = require('../controllers/AdminControllers/adminAppraisal');
+const adminController = require('../controllers/AdminControllers/adminAppraisal');
 const { getAdminDashboardData } = require('../controllers/AdminControllers/adminDashboard');
 const { getUsers, addUser, deleteUser } = require('../controllers/AdminControllers/adminManageUser');
 const expenseController = require('../controllers/AdminControllers/adminExpense');
@@ -308,7 +304,7 @@ router.delete('/users/:id', deleteUser);
 // ==============================
 router.get('/expenses', expenseController.getExpenses);
 router.put('/expenses/:id', expenseController.updateExpenseStatus);
-
+router.get('/expenses/:id/receipt', expenseController.getExpenseReceipt); 
 // ==============================
 // Dashboard
 // ==============================
@@ -326,11 +322,8 @@ router.post('/reset-allocations', resetYearlyAllocations);
 // ==============================
 // Appraisal Management
 // ==============================
-router.route('/appraisals')
-  .get(protect, authorize('admin'), getAllAppraisals)
-  .post(protect, authorize('admin'), createAppraisalCycle);
-
-router.get('/appraisals/stats', protect, authorize('admin'), getAppraisalStats);
+router.get('/appraisals', adminController.getAllAppraisalDetails);
+router.get('/appraisals/:id', adminController.getAppraisalDetails);
 // ==============================
 // Weekly Review Management
 router.route('/reviews').get(protect, getAllReviews);

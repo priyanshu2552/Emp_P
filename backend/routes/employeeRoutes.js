@@ -8,14 +8,9 @@ const employeeLeaveController = require('../controllers/EmployeeControllers/empl
 // using the updated one
 const employeeReview = require('../controllers/EmployeeControllers/employeeReview');
 const policyController = require('../controllers/EmployeeControllers/employeePolicy');
-const {
-  getCurrentAppraisal,
-  updateSelfEvaluation,
-  submitAppraisal,
-  getEmployeeAppraisals
-} = require('../controllers/EmployeeControllers/appraisalController');
+const employeeAppraisals= require('../controllers/EmployeeControllers/appraisalController');
 const multer = require('multer');
-
+router.use(authMiddleware.protect, authMiddleware.authorize('employee'));
 //-----image Upload things-------
 const upload = multer({
   limits: {
@@ -97,8 +92,8 @@ router.get('/policies/:id/text', authMiddleware.protect, policyController.getPol
 
 console.log('Employee routes loaded');
 //---------Appraisals---------
-router.get('/appraisals', authMiddleware.protect, authMiddleware.authorize('employee'), getEmployeeAppraisals);
-router.get('/appraisal', authMiddleware.protect, authMiddleware.authorize('employee'), getCurrentAppraisal);
-router.put('/appraisal', authMiddleware.protect, authMiddleware.authorize('employee'), updateSelfEvaluation);
-router.post('/appraisal/submit', authMiddleware.protect, authMiddleware.authorize('employee'), submitAppraisal);
+router.get('/appraisals', employeeAppraisals.getMyAppraisals);
+router.get('/appraisals/:id', employeeAppraisals.getAppraisalForm);
+router.put('/appraisals/:id/submit', employeeAppraisals.submitAppraisalForm);
+router.get('/appraisals/:id/review', employeeAppraisals.getReviewedAppraisal);
 module.exports = router;

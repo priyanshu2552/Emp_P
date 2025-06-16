@@ -284,6 +284,7 @@ const ManagerLayout = ({ children }) => {
                             width: drawerWidth,
                             boxSizing: 'border-box',
                             borderRight: 'none',
+                            zIndex: 1000,
                             transition: theme.transitions.create('width', {
                                 easing: theme.transitions.easing.sharp,
                                 duration: theme.transitions.duration.enteringScreen,
@@ -300,6 +301,8 @@ const ManagerLayout = ({ children }) => {
             <Box
                 component="main"
                 sx={{
+                    position: 'relative',
+                    zIndex: 1,
                     flexGrow: 1,
                     p: { xs: 2, md: 3 },
                     width: { md: `calc(100% - ${drawerWidth}px)` },

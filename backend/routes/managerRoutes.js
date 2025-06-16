@@ -1,14 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const router = express.Router();
-const {
-  getProfileImage,
-  getEmployeesUnderManager,
-  getEmployeeDetails,
-  updateManagerProfile,
-  uploadProfileImage,
-  getManagerProfile
-} = require('../controllers/ManagerControllers/managerProfile');
+const managerProfile = require('../controllers/ManagerControllers/managerProfile');
 
 const policyController = require('../controllers/ManagerControllers/managerPolicy');
 const authMiddleware = require('../middlewares/authMiddleware');
@@ -17,11 +10,7 @@ const managerExpense = require('../controllers/ManagerControllers/managerExpense
 const managerLeave = require('../controllers/ManagerControllers/managerLeave');
 const managerReview= require('../controllers/ManagerControllers/managerReview');
 const { getEmployeeDetailsById } = require('../controllers/ManagerControllers/managerReview');
-const {
-  getAppraisalsToReview,
-  submitManagerEvaluation,
-  getTeamOverview
-} = require('../controllers/ManagerControllers/managerAppraisal');
+const managerController = require('../controllers/ManagerControllers/managerAppraisal');
 const adminExpense = require('../controllers/ManagerControllers/managerExpense');
 
 router.use(authMiddleware.protect);
@@ -34,18 +23,21 @@ const upload = multer({
 });
 
 // ----- Profile Routes -----
-router.get('/:userId/profile-image', getProfileImage);
-router.get('/profile', getManagerProfile);
-router.put('/update-profile', updateManagerProfile);
+router.get(
+  '/:userId/profile-image',
+  managerProfile.getProfileImage
+);
+router.get('/profile', managerProfile.getManagerProfile);
+router.put('/update-profile', managerProfile.updateManagerProfile);
 router.put(
   '/profile/image',
   upload.single('profileImage'),
-  uploadProfileImage
+  managerProfile.uploadProfileImage
 );
 
 // ----- Employee Management -----
-router.get('/employees', getEmployeesUnderManager);
-router.get('/employee/:id', getEmployeeDetails);
+router.get('/employees', managerProfile.getEmployeesUnderManager);
+router.get('/employee/:id', managerProfile.getEmployeeDetails);
 
 // ----- Policies -----
 router.get('/policies', policyController.getAllPolicies);
@@ -78,7 +70,12 @@ router.route('/team')
 
 
 // ----- Appraisals -----
-router.get('/appraisals', authMiddleware.protect, authMiddleware.authorize('manager'), getAppraisalsToReview);
-router.get('/appraisals/overview', authMiddleware.protect, authMiddleware.authorize('manager'), getTeamOverview);
-router.put('/appraisals/:id/review', authMiddleware.protect, authMiddleware.authorize('manager'), submitManagerEvaluation);
+router.get('/team', managerController.getMyTeam);
+
+// Appraisal management
+router.post('/appraisals/send', managerController.sendAppraisalForm);
+router.get('/appraisals', managerController.getTeamAppraisals);
+router.get('/appraisals/:id', managerController.getAppraisalDetails);
+router.put('/appraisals/:id/review', managerController.reviewAppraisal);
+
 module.exports = router;

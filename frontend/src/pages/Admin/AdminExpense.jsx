@@ -3,9 +3,9 @@ import {
   Box, Typography, Select, MenuItem, TextField, Button, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Paper, Dialog,
   DialogTitle, DialogContent, DialogActions, IconButton, TablePagination,
-  Snackbar, Alert
+  Snackbar, Alert, Avatar, Chip
 } from '@mui/material';
-import { Check as ApproveIcon, Close as RejectIcon } from '@mui/icons-material';
+import { Check as ApproveIcon, Close as RejectIcon, Visibility as ViewIcon } from '@mui/icons-material';
 import axios from 'axios';
 
 const AdminExpenses = () => {
@@ -23,6 +23,12 @@ const AdminExpenses = () => {
     message: '',
     severity: 'success'
   });
+  const [receiptModal, setReceiptModal] = useState({
+    open: false,
+    receiptUrl: null,
+    receiptType: null,
+    filename: 'receipt'
+  });
 
   const token = localStorage.getItem('token');
 
@@ -38,6 +44,36 @@ const AdminExpenses = () => {
       showSnackbar('Failed to fetch expenses', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleViewReceipt = async (expenseId) => {
+    try {
+      const response = await axios.get(`http://localhost:5000/api/admin/expenses/${expenseId}/receipt`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+      });
+
+      const contentType = response.headers['content-type'];
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'receipt';
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+        if (filenameMatch) filename = filenameMatch[1];
+      }
+
+      const url = URL.createObjectURL(response.data);
+
+      setReceiptModal({
+        open: true,
+        receiptUrl: url,
+        receiptType: contentType,
+        filename: filename
+      });
+    } catch (error) {
+      console.error('Error loading receipt:', error);
+      showSnackbar('Error loading receipt', 'error');
     }
   };
 
@@ -116,6 +152,7 @@ const AdminExpenses = () => {
                   <TableCell sx={{ py: 0.5, fontWeight: 'bold' }}>Description</TableCell>
                   <TableCell sx={{ py: 0.5, fontWeight: 'bold' }}>Category</TableCell>
                   <TableCell sx={{ py: 0.5, fontWeight: 'bold' }}>Status</TableCell>
+                  <TableCell sx={{ py: 0.5, fontWeight: 'bold' }}>Receipt</TableCell>
                   <TableCell sx={{ py: 0.5, fontWeight: 'bold' }}>Comments</TableCell>
                   <TableCell sx={{ py: 0.5, fontWeight: 'bold' }}>Actions</TableCell>
                 </TableRow>
@@ -123,14 +160,23 @@ const AdminExpenses = () => {
               <TableBody>
                 {expenses.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center" sx={{ py: 2 }}>
+                    <TableCell colSpan={8} align="center" sx={{ py: 2 }}>
                       No expenses found
                     </TableCell>
                   </TableRow>
                 ) : (
                   expenses.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((expense) => (
                     <TableRow key={expense._id} hover sx={{ height: '48px' }}>
-                      <TableCell sx={{ py: 0.5 }}>{expense.userId?.name || 'N/A'}</TableCell>
+                      <TableCell sx={{ py: 0.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Avatar sx={{ width: 24, height: 24 }}>
+                            {expense.userId?.name?.charAt(0) || 'U'}
+                          </Avatar>
+                          <Typography variant="body2">
+                            {expense.userId?.name || 'N/A'}
+                          </Typography>
+                        </Box>
+                      </TableCell>
                       <TableCell sx={{ py: 0.5 }}>${expense.amount}</TableCell>
                       <TableCell sx={{ 
                         maxWidth: 200,
@@ -141,13 +187,25 @@ const AdminExpenses = () => {
                       }}>
                         {expense.description}
                       </TableCell>
-                      <TableCell sx={{ py: 0.5 }}>{expense.category}</TableCell>
+                      <TableCell sx={{ py: 0.5 }}>
+                        <Chip label={expense.category} size="small" />
+                      </TableCell>
                       <TableCell sx={{ 
                         py: 0.5,
                         color: expense.status === 'approved' ? 'green' : 
                               expense.status === 'rejected' ? 'red' : 'inherit'
                       }}>
                         {expense.status}
+                      </TableCell>
+                      <TableCell sx={{ py: 0.5 }}>
+                        {(expense.receipt || expense.receiptUrl) && (
+                          <IconButton
+                            size="small"
+                            onClick={() => handleViewReceipt(expense._id)}
+                          >
+                            <ViewIcon fontSize="small" />
+                          </IconButton>
+                        )}
                       </TableCell>
                       <TableCell sx={{ 
                         maxWidth: 200,
@@ -223,6 +281,44 @@ const AdminExpenses = () => {
           >
             {actionType === 'approve' ? 'Approve' : 'Reject'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Receipt Modal */}
+      <Dialog
+        open={receiptModal.open}
+        onClose={() => setReceiptModal({...receiptModal, open: false})}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Expense Receipt</DialogTitle>
+        <DialogContent>
+          {receiptModal.receiptUrl ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+              {receiptModal.receiptType.includes('image') ? (
+                <img
+                  src={receiptModal.receiptUrl}
+                  alt="Receipt"
+                  style={{ maxWidth: '100%', maxHeight: '500px', objectFit: 'contain' }}
+                />
+              ) : (
+                <Button
+                  variant="contained"
+                  href={receiptModal.receiptUrl}
+                  download={receiptModal.filename}
+                >
+                  Download Receipt
+                </Button>
+              )}
+            </Box>
+          ) : (
+            <Typography variant="body1" color="text.secondary" align="center" sx={{ my: 4 }}>
+              No receipt available
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setReceiptModal({...receiptModal, open: false})}>Close</Button>
         </DialogActions>
       </Dialog>
 

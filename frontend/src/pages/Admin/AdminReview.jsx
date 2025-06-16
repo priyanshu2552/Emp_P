@@ -7,6 +7,13 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 5,
+    showSizeChanger: true,
+    pageSizeOptions: [5, 10, 15, 20],
+    total: 0
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -28,6 +35,10 @@ const AdminDashboard = () => {
         setUsers(usersRes.data);
         setStats(statsRes.data);
         setLoading(false);
+        setPagination({
+          ...pagination,
+          total: reviewsRes.data.length // Set total number of items
+        });
       } catch (error) {
         console.error(error);
       }
@@ -36,6 +47,10 @@ const AdminDashboard = () => {
     fetchData();
   }, []);
 
+  const handleTableChange = (newPagination) => {
+    setPagination(newPagination);
+  };
+
   const reviewColumns = [
     { title: 'Employee', dataIndex: ['employee', 'name'], key: 'employee' },
     { title: 'Week Start', dataIndex: 'weekStartDate', key: 'weekStart' },
@@ -43,55 +58,50 @@ const AdminDashboard = () => {
     { title: 'Rating', dataIndex: ['managerReview', 'rating'], key: 'rating' }
   ];
 
-  const userColumns = [
-    { title: 'Name', dataIndex: 'name', key: 'name' },
-    { title: 'Email', dataIndex: 'email', key: 'email' },
-    { title: 'Role', dataIndex: 'role', key: 'role' },
-    { title: 'Department', dataIndex: 'Department', key: 'department' }
-  ];
-
   return (
-    <div>
-      <h1>Admin Dashboard</h1>
-      
-      <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col span={6}>
+    <div style={{
+      padding: '24px',
+      maxHeight: '100vh',
+      overflow: 'auto'
+    }}>
+      <h1 style={{ marginBottom: '24px' }}>Admin Dashboard</h1>
+
+      <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+        <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic title="Total Employees" value={stats.totalEmployees} />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic title="Total Managers" value={stats.totalManagers} />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic title="Pending Reviews" value={stats.pendingReviews} />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic title="Reviewed" value={stats.reviewedReviews} />
           </Card>
         </Col>
       </Row>
 
-      <h2>Weekly Reviews</h2>
-      <Table 
-        dataSource={reviews} 
-        columns={reviewColumns} 
-        rowKey="_id" 
-        loading={loading}
-      />
-
-      <h2>Users</h2>
-      <Table 
-        dataSource={users} 
-        columns={userColumns} 
-        rowKey="_id" 
-        loading={loading}
-      />
+      <div style={{ marginBottom: '24px' }}>
+        <h2>Weekly Reviews</h2>
+        <Table
+          dataSource={reviews}
+          columns={reviewColumns}
+          rowKey="_id"
+          loading={loading}
+          pagination={pagination}
+          onChange={handleTableChange}
+          scroll={{ x: true }}
+          style={{ width: '100%' }}
+        />
+      </div>
     </div>
   );
 };

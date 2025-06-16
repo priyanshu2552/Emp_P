@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
     Box,
     Drawer,
@@ -59,7 +60,40 @@ const ManagerLayout = ({ children }) => {
 
     const user = JSON.parse(localStorage.getItem('user'));
     const name = user?.name || 'Manager';
-    const image = user?.image || '/default-avatar.png';
+
+    //image handling 
+    const [imageLoading, setImageLoading] = useState(true);
+    const [userImage, setUserImage] = useState(user?.profileImage || '/default-avatar.png');
+
+    const axiosInstance = axios.create({
+        baseURL: 'http://localhost:5000/api',
+        headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+    });
+    useEffect(() => {
+        // Set the initial image when component mounts
+        if (user?._id) {
+            const imageUrl = `http://localhost:5000/api/manager/${user._id}/profile-image?${Date.now()}`;
+            setUserImage(imageUrl);
+        }
+    }, [user?._id]);
+
+    useEffect(() => {
+        const handleStorageChange = () => {
+            const updatedUser = JSON.parse(localStorage.getItem('user'));
+            if (updatedUser?._id) {
+                const newImageUrl = `http://localhost:5000/api/manager/${updatedUser._id}/profile-image?${Date.now()}`;
+                setUserImage(newImageUrl);
+            }
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+        };
+    }, []);
 
     const handleDrawerToggle = () => {
         setMobileOpen(!mobileOpen);
@@ -79,7 +113,7 @@ const ManagerLayout = ({ children }) => {
         { label: 'Leave Approvals', to: '/manager/leave', icon: <LeaveIcon /> },
         { label: 'Appraisal Reviews', to: '/manager/appraisal', icon: <AppraisalIcon /> },
         { label: 'Weekly Reviews', to: '/manager/review', icon: <ReviewIcon /> },
-        { label: 'Team Management', to: '/manager/team', icon: <TeamIcon /> },
+
     ];
 
     const StyledNavLink = styled(NavLink)(({ theme }) => ({
@@ -113,13 +147,19 @@ const ManagerLayout = ({ children }) => {
                         Manager Portal
                     </Typography>
                     <Avatar
-                        src={image}
+                        src={userImage}
                         sx={{
                             width: 80,
                             height: 80,
                             mb: 2,
                             mx: 'auto',
                             border: '3px solid rgba(255, 255, 255, 0.3)',
+                        }}
+                        imgProps={{
+                            onError: (e) => {
+                                e.target.src = '/default-avatar.png';
+                            },
+                            onLoad: () => setImageLoading(false),
                         }}
                     />
                     <Typography
@@ -244,6 +284,7 @@ const ManagerLayout = ({ children }) => {
                             width: drawerWidth,
                             boxSizing: 'border-box',
                             borderRight: 'none',
+                            zIndex: 1000,
                             transition: theme.transitions.create('width', {
                                 easing: theme.transitions.easing.sharp,
                                 duration: theme.transitions.duration.enteringScreen,
@@ -258,8 +299,10 @@ const ManagerLayout = ({ children }) => {
             </Box>
 
             <Box
-                component="main"
-                sx={{
+               component="main"
+  sx={{
+    position: 'relative',
+    zIndex: 1,
                     flexGrow: 1,
                     p: { xs: 2, md: 3 },
                     width: { md: `calc(100% - ${drawerWidth}px)` },

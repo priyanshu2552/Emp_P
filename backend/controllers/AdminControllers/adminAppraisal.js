@@ -1,84 +1,143 @@
 const Appraisal = require('../../models/Appraisal');
 const User = require('../../models/User');
 
-// Create appraisal cycle
-exports.createAppraisalCycle = async (req, res) => {
+// Get all appraisal details with populated employee and manager info
+exports.getAllAppraisalDetails = async (req, res) => {
   try {
-    const { period, year, employees } = req.body;
-    
-    // Validate period
-    const validPeriods = ['Q1', 'Q2', 'Q3', 'Q4', 'Annual'];
-    if (!validPeriods.includes(period)) {
-      return res.status(400).json({ message: 'Invalid appraisal period' });
-    }
+    const appraisals = await Appraisal.find()
+      .populate({
+        path: 'employee',
+        select: 'name email EmployeeId Department role contact'
+      })
+      .populate({
+        path: 'manager',
+        select: 'name email EmployeeId Department role'
+      })
+      .sort({ year: -1, period: 1, createdAt: -1 });
 
-    // Create appraisals for selected employees
-    const appraisals = await Promise.all(employees.map(async employeeId => {
-      const employee = await User.findById(employeeId);
-      if (!employee) throw new Error(`Employee ${employeeId} not found`);
+    // Transform the data for better frontend consumption
+    const transformedAppraisals = appraisals.map(appraisal => ({
+      _id: appraisal._id,
+      period: appraisal.period,
+      year: appraisal.year,
+      status: appraisal.status,
+      createdAt: appraisal.createdAt,
+      updatedAt: appraisal.updatedAt,
       
-      return new Appraisal({
-        employee: employee._id,
-        manager: employee.manager,
-        period,
-        year,
-        status: 'draft'
-      }).save();
+      // Employee Details
+      employee: {
+        _id: appraisal.employee._id,
+        name: appraisal.employee.name,
+        email: appraisal.employee.email,
+        employeeId: appraisal.employee.EmployeeId,
+        department: appraisal.employee.Department,
+        role: appraisal.employee.role,
+        contact: appraisal.employee.contact
+      },
+      
+      // Manager Details
+      manager: {
+        _id: appraisal.manager._id,
+        name: appraisal.manager.name,
+        email: appraisal.manager.email,
+        employeeId: appraisal.manager.EmployeeId,
+        department: appraisal.manager.Department,
+        role: appraisal.manager.role
+      },
+      
+      // Work Items
+      workItems: appraisal.workItems,
+      
+      // Goals
+      goals: appraisal.goals,
+      
+      // Key Results
+      keyResults: appraisal.keyResults,
+      
+      // Additional Comments
+      additionalComments: appraisal.additionalComments,
+      
+      // Employee Submission
+      employeeSubmission: appraisal.employeeSubmission,
+      
+      // Manager Review
+      managerReview: appraisal.managerReview
     }));
 
-    res.status(201).json(appraisals);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.json(transformedAppraisals);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };
 
-// Get all appraisals with filters
-exports.getAllAppraisals = async (req, res) => {
+// Get single appraisal with full details
+exports.getAppraisalDetails = async (req, res) => {
   try {
-    const { status, period, year, department } = req.query;
-    const filter = {};
-    
-    if (status) filter.status = status;
-    if (period) filter.period = period;
-    if (year) filter.year = year;
-    
-    // Add department filter if provided
-    if (department) {
-      const employees = await User.find({ Department: department }).select('_id');
-      filter.employee = { $in: employees.map(e => e._id) };
+    const appraisal = await Appraisal.findById(req.params.id)
+      .populate({
+        path: 'employee',
+        select: 'name email EmployeeId Department role contact createdAt'
+      })
+      .populate({
+        path: 'manager',
+        select: 'name email EmployeeId Department role'
+      });
+
+    if (!appraisal) {
+      return res.status(404).json({ error: 'Appraisal not found' });
     }
-    
-    const appraisals = await Appraisal.find(filter)
-      .populate('employee', 'name email EmployeeId Department')
-      .populate('manager', 'name email')
-      .sort({ year: -1, period: 1 });
-    
-    res.status(200).json(appraisals);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
 
-// Get appraisal statistics
-exports.getAppraisalStats = async (req, res) => {
-  try {
-    const currentYear = new Date().getFullYear();
-    const stats = await Appraisal.aggregate([
-      { $match: { year: currentYear } },
-      { $group: {
-        _id: { period: "$period", status: "$status" },
-        count: { $sum: 1 },
-        avgRating: { $avg: "$overallRating" }
-      }},
-      { $group: {
-        _id: "$_id.period",
-        statuses: { $push: { status: "$_id.status", count: "$count" } },
-        avgRating: { $avg: "$avgRating" }
-      }}
-    ]);
-    
-    res.status(200).json(stats);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    const transformedAppraisal = {
+      _id: appraisal._id,
+      period: appraisal.period,
+      year: appraisal.year,
+      status: appraisal.status,
+      createdAt: appraisal.createdAt,
+      updatedAt: appraisal.updatedAt,
+      
+      // Employee Details
+      employee: {
+        _id: appraisal.employee._id,
+        name: appraisal.employee.name,
+        email: appraisal.employee.email,
+        employeeId: appraisal.employee.EmployeeId,
+        department: appraisal.employee.Department,
+        role: appraisal.employee.role,
+        contact: appraisal.employee.contact,
+        joinDate: appraisal.employee.createdAt
+      },
+      
+      // Manager Details
+      manager: {
+        _id: appraisal.manager._id,
+        name: appraisal.manager.name,
+        email: appraisal.manager.email,
+        employeeId: appraisal.manager.EmployeeId,
+        department: appraisal.manager.Department,
+        role: appraisal.manager.role
+      },
+      
+      // Work Section
+      workItems: appraisal.workItems,
+      
+      // Goals Section
+      goals: appraisal.goals,
+      
+      // Key Results
+      keyResults: appraisal.keyResults,
+      
+      // Additional Comments
+      additionalComments: appraisal.additionalComments,
+      
+      // Employee Submission
+      employeeSubmission: appraisal.employeeSubmission,
+      
+      // Manager Review
+      managerReview: appraisal.managerReview
+    };
+
+    res.json(transformedAppraisal);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };
