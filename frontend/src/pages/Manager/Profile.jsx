@@ -55,7 +55,8 @@ const ManagerProfilePage = () => {
     const [error, setError] = useState('');
     const [imagePreview, setImagePreview] = useState('');
     const [uploadingImage, setUploadingImage] = useState(false);
-
+    const user = JSON.parse(localStorage.getItem('user'));
+    const [userImage, setUserImage] = useState(user?.profileImage || '/default-avatar.png');
     const [snackbarState, setSnackbarState] = useState({
         open: false,
         message: '',
@@ -76,60 +77,60 @@ const ManagerProfilePage = () => {
     };
 
     const fetchManagerProfile = async () => {
-    try {
-        setLoadingProfile(true);
-        const { data } = await axiosInstance.get('/profile');
-        if (data.manager) {
-            setManager(data.manager);
-            setFormData(data.manager);
-            if (data.manager._id) {
-                // Add timestamp to force refresh
-                setImagePreview(`http://localhost:5000/api/manager/${data.manager._id}/profile-image?${Date.now()}`);
+        try {
+            setLoadingProfile(true);
+            const { data } = await axiosInstance.get('/profile');
+            if (data.manager) {
+                setManager(data.manager);
+                setFormData(data.manager);
+                if (data.manager._id) {
+                    // Add timestamp to force refresh
+                    setImagePreview(`http://localhost:5000/api/manager/${data.manager._id}/profile-image?${Date.now()}`);
+                }
             }
+        } catch (err) {
+            console.error('Profile fetch error:', err);
+            showSnackbar('Error fetching manager profile', 'error');
+        } finally {
+            setLoadingProfile(false);
         }
-    } catch (err) {
-        console.error('Profile fetch error:', err);
-        showSnackbar('Error fetching manager profile', 'error');
-    } finally {
-        setLoadingProfile(false);
-    }
-};
+    };
 
-// Add this image upload handler
-const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    // Add this image upload handler
+    const handleImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
 
-    try {
-        setUploadingImage(true);
-        const formData = new FormData();
-        formData.append('profileImage', file);
+        try {
+            setUploadingImage(true);
+            const formData = new FormData();
+            formData.append('profileImage', file);
 
-        const { data } = await axiosInstance.put(
-            '/profile/image',
-            formData,
-            { headers: { 'Content-Type': 'multipart/form-data' } }
-        );
+            const { data } = await axiosInstance.put(
+                '/profile/image',
+                formData,
+                { headers: { 'Content-Type': 'multipart/form-data' } }
+            );
 
-        if (data.success) {
-            // Update local storage
-            localStorage.setItem('user', JSON.stringify(data.profile));
-            
-            // Force refresh the image with new timestamp
-            setImagePreview(`http://localhost:5000/api/manager/${manager._id}/profile-image?${Date.now()}`);
-            
-            // Trigger layout update
-            window.dispatchEvent(new Event('storage'));
-            
-            showSnackbar('Profile image updated successfully!', 'success');
+            if (data.success) {
+                // Update local storage
+                localStorage.setItem('user', JSON.stringify(data.profile));
+
+                // Force refresh the image with new timestamp
+                setImagePreview(`http://localhost:5000/api/manager/${manager._id}/profile-image?${Date.now()}`);
+                setUserImage(imagePreview);
+                // Trigger layout update
+                window.dispatchEvent(new Event('storage'));
+
+                showSnackbar('Profile image updated successfully!', 'success');
+            }
+        } catch (err) {
+            console.error('Upload error:', err);
+            showSnackbar(err.response?.data?.message || 'Image upload failed', 'error');
+        } finally {
+            setUploadingImage(false);
         }
-    } catch (err) {
-        console.error('Upload error:', err);
-        showSnackbar(err.response?.data?.message || 'Image upload failed', 'error');
-    } finally {
-        setUploadingImage(false);
-    }
-};
+    };
 
     const fetchEmployees = async () => {
         try {
@@ -244,7 +245,7 @@ const handleImageUpload = async (e) => {
                             <Grid item xs={12} md={3}>
                                 <Box display="flex" flexDirection="column" alignItems="center">
                                     <Avatar
-                                        src={imagePreview}
+                                        src={userImage}
                                         sx={{ width: 150, height: 150, mb: 2 }}
                                         imgProps={{
                                             onError: (e) => {
@@ -291,7 +292,7 @@ const handleImageUpload = async (e) => {
                             <Grid item xs={12} md={3}>
                                 <Box display="flex" flexDirection="column" alignItems="center">
                                     <Avatar
-                                        src={imagePreview}
+                                        src={userImage}
                                         sx={{ width: 150, height: 150, mb: 2 }}
                                         imgProps={{
                                             onError: (e) => {

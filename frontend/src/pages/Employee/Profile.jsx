@@ -47,9 +47,11 @@ const EmployeeProfile = () => {
         message: '',
         severity: 'success'
     });
-    const [imagePreview, setImagePreview] = useState('');
     const [uploadingImage, setUploadingImage] = useState(false);
-
+    const [imageUrl, setImageUrl] = useState('');
+    const user = JSON.parse(localStorage.getItem('user'));
+    const profileImage = user?.profileImage || '/default-avatar.png';
+    const [userImage, setUserImage] = useState(profileImage);
     const axiosInstance = axios.create({
         baseURL: 'http://localhost:5000/api',
         headers: {
@@ -73,9 +75,13 @@ const EmployeeProfile = () => {
                         Department: data.profile.Department || '',
                         EmployeeId: data.profile.EmployeeId || '',
                     });
-                    if (data.profile._id) {
-                        setImagePreview(`http://localhost:5000/api/employees/${data.profile._id}/profile-image?${Date.now()}`);
-                        console.log(imagePreview);
+
+                    // Get user from localStorage
+                    const user = JSON.parse(localStorage.getItem('user'));
+                    if (user?._id) {
+                        // Use the same image URL format as in DashboardLayout
+                        const newImageUrl = `http://localhost:5000/api/employees/${user._id}/profile-image?${Date.now()}`;
+                        setImageUrl(newImageUrl);
                     }
                 }
             } catch (err) {
@@ -84,7 +90,22 @@ const EmployeeProfile = () => {
                 setLoadingProfile(false);
             }
         };
+
+        // Listen for storage changes (when image is updated)
+        const handleStorageChange = () => {
+            const user = JSON.parse(localStorage.getItem('user'));
+            if (user?._id) {
+                const newImageUrl = `http://localhost:5000/api/employees/${user._id}/profile-image?${Date.now()}`;
+                setImageUrl(newImageUrl);
+            }
+        };
+
+        window.addEventListener('storage', handleStorageChange);
         fetchProfile();
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+        };
     }, []);
 
     const fetchManagers = async (search = '') => {
@@ -151,13 +172,17 @@ const EmployeeProfile = () => {
             );
 
             if (data.success) {
-                // Update local storage
-                localStorage.setItem('user', JSON.stringify(data.profile));
+                // Create server-side image URL with cache busting
+                const serverImageUrl = `http://localhost:5000/api/employees/${data.profile._id}/profile-image?${Date.now()}`;
+                const imageUrl = `http://localhost:5000/api/employees/${user._id}/profile-image?${Date.now()}`;
+                // Update local storage with the new profile data
+                const updatedUser = { ...data.profile, profileImage: imageUrl };
+                localStorage.setItem('user', JSON.stringify(updatedUser));
 
-                // Update image preview
-                const newImageUrl = `http://localhost:5000/api/employees/${profile._id}/profile-image?${Date.now()}`;
-                setImagePreview(newImageUrl);
-
+                // Update state with the new image URL
+                setImageUrl(serverImageUrl);
+                setUserImage(serverImageUrl);
+                
                 // Force refresh the layout image
                 window.dispatchEvent(new Event('storage'));
 
@@ -169,7 +194,30 @@ const EmployeeProfile = () => {
             setUploadingImage(false);
         }
     };
+    useEffect(() => {
+        // Set the initial image when component mounts
+        if (user?._id) {
+            const imageUrl = `http://localhost:5000/api/employees/${user._id}/profile-image?${Date.now()}`;
+            setUserImage(imageUrl);
+        }
+    }, [user?._id]); // This will run when user._id changes
+    // In DashboardLayout component
+    // In DashboardLayout component
+    useEffect(() => {
+        const handleStorageChange = () => {
+            const updatedUser = JSON.parse(localStorage.getItem('user'));
+            if (updatedUser?._id) {
+                const newImageUrl = `http://localhost:5000/api/employees/${updatedUser._id}/profile-image?${Date.now()}`;
+                setUserImage(newImageUrl);
+            }
+        };
 
+        window.addEventListener('storage', handleStorageChange);
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+        };
+    }, []);
     const showSnackbar = (message, severity) => {
         setSnackbar({
             open: true,
@@ -247,12 +295,17 @@ const EmployeeProfile = () => {
                             <Box display="flex" flexDirection={{ xs: 'column', sm: 'row' }} gap={2}>
                                 <Box display="flex" flexDirection="column" alignItems="center" flexShrink={0}>
                                     <Avatar
-                                        src={imagePreview}
+                                        src={userImage}
                                         alt="Profile"
                                         sx={{
                                             width: 80,
                                             height: 80,
                                             mb: 1
+                                        }}
+                                        imgProps={{
+                                            onError: (e) => {
+                                                e.target.src = '/default-avatar.png';
+                                            }
                                         }}
                                     />
                                     <Button
@@ -329,12 +382,17 @@ const EmployeeProfile = () => {
                                 <Box display="flex" flexDirection={{ xs: 'column', sm: 'row' }} gap={2}>
                                     <Box display="flex" flexDirection="column" alignItems="center" flexShrink={0}>
                                         <Avatar
-                                            src={imagePreview}
+                                            src={userImage}
                                             alt="Profile Preview"
                                             sx={{
                                                 width: 80,
                                                 height: 80,
                                                 mb: 1
+                                            }}
+                                            imgProps={{
+                                                onError: (e) => {
+                                                    e.target.src = '/default-avatar.png';
+                                                }
                                             }}
                                         />
                                         <Button
